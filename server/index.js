@@ -9,7 +9,13 @@ import fs from "fs";
 dotenv.config();
 
 const app = express();
-app.use(cors());
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+    methods: ["GET", "POST"],
+    allowedHeaders: ["Content-Type"],
+  })
+);
 app.use(express.json());
 
 // 🔹 Inicializa o Firebase Admin com a conta de serviço
@@ -23,8 +29,10 @@ if (!fs.existsSync(serviceAccountPath)) {
   process.exit(1);
 }
 
+const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, "utf8"));
+
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccountPath),
+  credential: admin.credential.cert(serviceAccount),
 });
 
 const db = admin.firestore();
@@ -56,6 +64,8 @@ app.post("/create_payment", async (req, res) => {
       },
     });
 
+    const transaction = response.point_of_interaction.transaction_data;
+
     // 🔹 Salva no Firestore
     await db.collection("payments").doc(String(response.id)).set({
       id: response.id,
@@ -64,15 +74,14 @@ app.post("/create_payment", async (req, res) => {
       presentId,
       status: response.status,
       createdAt: new Date(),
-      qr_code: response.point_of_interaction.transaction_data.qr_code,
-      qr_code_base64:
-        response.point_of_interaction.transaction_data.qr_code_base64,
+      qr_code: transaction.qr_code,
+      qr_code_base64: transaction.qr_code_base64,
     });
 
     res.json({
       paymentId: response.id,
-      qr_code: response.point_of_interaction.transaction_data.qr_code,
-      qr_base64: response.point_of_interaction.transaction_data.qr_code_base64,
+      qr_code: transaction.qr_code,
+      qr_base64: transaction.qr_code_base64,
       expiresAt: response.date_of_expiration,
     });
   } catch (error) {
@@ -90,7 +99,6 @@ app.post("/webhook", async (req, res) => {
     if (payment && payment.data && payment.data.id) {
       const paymentId = String(payment.data.id);
 
-      // Atualiza status no Firestore
       await db.collection("payments").doc(paymentId).update({
         status: payment.type,
         updatedAt: new Date(),
@@ -102,6 +110,11 @@ app.post("/webhook", async (req, res) => {
     console.error("❌ Erro no webhook:", error);
     res.sendStatus(500);
   }
+});
+
+// 🔹 Endpoint de teste (ping)
+app.get("/", (req, res) => {
+  res.send("✅ Wedding Server rodando com Mercado Pago Sandbox!");
 });
 
 // 🔹 Inicia o servidor
