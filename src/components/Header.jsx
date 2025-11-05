@@ -18,6 +18,7 @@ const Header = () => {
       </div>
 
       <nav className={`header-nav ${menuAberto ? "ativo" : ""}`}>
+        <Link to="/" onClick={() => setMenuAberto(false)}>Início</Link>
         <Link to="/" onClick={() => setMenuAberto(false)}>Início</Link>        
         <Link to="/presenca" onClick={() => setMenuAberto(false)}>Confirmar Presença</Link>
         <Link to="/presentes" onClick={() => setMenuAberto(false)}>Lista de Presentes</Link>
