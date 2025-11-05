@@ -12,11 +12,11 @@ export default function Pagamento() {
 
   useEffect(() => {
     if (!presentId) {
-      navigate("/presentes");
+      navigate("/presents");
       return;
     }
     // Listen Firestore present doc to update status in real time
-    const unsubscribe = onSnapshot(doc(db, "presentes", presentId), (snap) => {
+    const unsubscribe = onSnapshot(doc(db, "presents", presentId), (snap) => {
       const data = snap.data();
       const st = data?.payment?.status;
       setStatus(st);
@@ -66,12 +66,12 @@ export default function Pagamento() {
       {status === "paid" ? (
         <div>
           <p style={{ color: "green", fontWeight: "bold" }}>Pagamento confirmado! Obrigado 🎉</p>
-          <button onClick={() => navigate("/presentes")}>Voltar à lista</button>
+          <button onClick={() => navigate("/presents")}>Voltar à lista</button>
         </div>
       ) : status === "expired" ? (
         <div>
           <p style={{ color: "red", fontWeight: "bold" }}>O tempo expirou. O presente está disponível novamente.</p>
-          <button onClick={() => navigate("/presentes")}>Voltar</button>
+          <button onClick={() => navigate("/presents")}>Voltar</button>
         </div>
       ) : (
         <div>
@@ -87,7 +87,7 @@ export default function Pagamento() {
 
           <p style={{ marginTop: 16 }}>Tempo restante para pagamento: <strong>{formatTime(timeLeft)}</strong></p>
           <p style={{ fontSize: 14, color: "#666" }}>Aguarde a confirmação — atualizaremos automaticamente.</p>
-          <button onClick={() => navigate("/presentes")} style={{ marginTop: 12 }}>Cancelar / Voltar</button>
+          <button onClick={() => navigate("/presents")} style={{ marginTop: 12 }}>Cancelar / Voltar</button>
         </div>
       )}
     </div>
