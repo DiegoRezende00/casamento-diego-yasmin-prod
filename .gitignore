@@ -28,3 +28,4 @@ server/service-account.json
 .env
 server/.env
 server/node_modules
+src/.env
