@@ -4,7 +4,6 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { MercadoPagoConfig, Payment } from "mercadopago";
 import admin from "firebase-admin";
-import fs from "fs";
 
 dotenv.config();
 
@@ -22,35 +21,24 @@ app.use(
 );
 
 // ----- Firebase Admin init -----
-// Pode passar a service account como JSON string na env FIREBASE_SERVICE_ACCOUNT
-// (útil para deploy em Render/Vercel) OU apontar para um arquivo local com FIREBASE_SERVICE_ACCOUNT_PATH.
+// Prioriza variável de ambiente FIREBASE_SERVICE_ACCOUNT (JSON completo)
 const serviceAccountEnv = process.env.FIREBASE_SERVICE_ACCOUNT;
-const serviceAccountPath =
-  process.env.FIREBASE_SERVICE_ACCOUNT_PATH || "./service-account.json";
+
+if (!serviceAccountEnv) {
+  console.error(
+    "❌ Nenhuma credencial Firebase encontrada. Configure FIREBASE_SERVICE_ACCOUNT"
+  );
+  process.exit(1);
+}
 
 let serviceAccount;
-if (serviceAccountEnv) {
-  try {
-    serviceAccount = JSON.parse(serviceAccountEnv);
-    console.log(
-      "🔒 Usando service account vindo de env (FIREBASE_SERVICE_ACCOUNT)."
-    );
-  } catch (err) {
-    console.error("❌ FIREBASE_SERVICE_ACCOUNT inválido (JSON):", err.message);
-    process.exit(1);
-  }
-} else if (fs.existsSync(serviceAccountPath)) {
-  try {
-    serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, "utf8"));
-    console.log("🔒 Usando service account do arquivo:", serviceAccountPath);
-  } catch (err) {
-    console.error("❌ Falha ao ler service-account.json:", err.message);
-    process.exit(1);
-  }
-} else {
-  console.error(
-    "❌ Nenhuma credencial Firebase encontrada. Configure FIREBASE_SERVICE_ACCOUNT ou FIREBASE_SERVICE_ACCOUNT_PATH"
+try {
+  serviceAccount = JSON.parse(serviceAccountEnv);
+  console.log(
+    "🔒 Usando service account vindo de env (FIREBASE_SERVICE_ACCOUNT)."
   );
+} catch (err) {
+  console.error("❌ FIREBASE_SERVICE_ACCOUNT inválido (JSON):", err.message);
   process.exit(1);
 }
 
@@ -61,11 +49,12 @@ const db = admin.firestore();
 console.log("✅ Conectado ao Firebase Firestore");
 
 // ----- Mercado Pago init -----
-// Suporta alternar entre "sandbox" e "live" via MODE env
 const MODE = (process.env.MODE || "sandbox").toLowerCase(); // "sandbox" | "live"
 const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN;
 if (!MP_ACCESS_TOKEN) {
-  console.error("❌ MP_ACCESS_TOKEN não definido no .env");
+  console.error(
+    "❌ MP_ACCESS_TOKEN não definido no .env ou variável de ambiente"
+  );
   process.exit(1);
 }
 const client = new MercadoPagoConfig({ accessToken: MP_ACCESS_TOKEN });
@@ -92,7 +81,7 @@ app.post("/create_payment", async (req, res) => {
     });
 
     const transaction = response.point_of_interaction?.transaction_data || {};
-    // grava também no doc do presente para linkar (se existir)
+
     if (presentId) {
       const presentRef = db.collection("presents").doc(presentId);
       await presentRef.set(
@@ -111,7 +100,6 @@ app.post("/create_payment", async (req, res) => {
       );
     }
 
-    // salva registro central em "payments"
     await db
       .collection("payments")
       .doc(String(response.id))
@@ -133,46 +121,32 @@ app.post("/create_payment", async (req, res) => {
       expiresAt: response.date_of_expiration || null,
     });
   } catch (err) {
-    console.error(
-      "❌ Erro ao criar pagamento:",
-      (err && err.message) || err,
-      err?.cause || ""
-    );
-    // se MercadoPago retorna objeto com status/description, tenta enviar para frontend
-    return res
-      .status(500)
-      .json({
-        error: "create_payment_failed",
-        detail: (err && err.message) || err,
-      });
+    console.error("❌ Erro ao criar pagamento:", err?.message || err);
+    return res.status(500).json({
+      error: "create_payment_failed",
+      detail: err?.message || err,
+    });
   }
 });
 
-// Webhook do Mercado Pago (configurar na dashboard para apontar para /webhook)
+// Webhook do Mercado Pago
 app.post("/webhook", async (req, res) => {
   try {
     const body = req.body;
     console.log("📩 Webhook MP recebido:", body);
 
-    // O Mercado Pago pode mandar diferentes formatos. Tenta extrair id:
-    let paymentId = null;
-    if (body?.data?.id) paymentId = String(body.data.id);
-    if (!paymentId && body?.id) paymentId = String(body.id);
-    if (!paymentId && body?.resource?.id) paymentId = String(body.resource.id);
-
+    let paymentId = body?.data?.id || body?.id || body?.resource?.id;
     if (!paymentId) {
       console.warn("Webhook sem payment id.");
       return res.sendStatus(200);
     }
 
-    // get payment details from MP to know status
     try {
       const mpPayment = await new Payment(client).get(paymentId);
       const mpBody = mpPayment;
       const status =
         mpBody.status || (mpBody.body && mpBody.body.status) || null;
 
-      // Update payments and presents documents accordingly
       await db.collection("payments").doc(paymentId).set(
         {
           status: status,
@@ -182,7 +156,6 @@ app.post("/webhook", async (req, res) => {
         { merge: true }
       );
 
-      // se existir present with this payment id, atualiza
       const presentsQuery = await db
         .collection("presents")
         .where("payment.id", "==", paymentId)
@@ -208,7 +181,7 @@ app.post("/webhook", async (req, res) => {
   }
 });
 
-// health
+// health check
 app.get("/", (req, res) => res.send("✅ Wedding Server rodando"));
 
 // start
