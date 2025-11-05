@@ -25,3 +25,6 @@ dist-ssr
 
 # Credenciais do backend
 server/service-account.json
+.env
+server/.env
+.env.local
