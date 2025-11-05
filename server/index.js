@@ -4,6 +4,9 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { MercadoPagoConfig, Payment } from "mercadopago";
 import admin from "firebase-admin";
+import path from "path";
+import { fileURLToPath } from "url";
+import fs from "fs";
 
 dotenv.config();
 
@@ -21,7 +24,6 @@ app.use(
 );
 
 // ----- Firebase Admin init -----
-// Prioriza variável de ambiente FIREBASE_SERVICE_ACCOUNT (JSON completo)
 let serviceAccount;
 
 if (process.env.FIREBASE_SERVICE_ACCOUNT) {
@@ -36,8 +38,6 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT) {
   }
 } else if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
   try {
-    // Só para desenvolvimento local
-    const fs = await import("fs");
     serviceAccount = JSON.parse(
       fs.readFileSync(process.env.FIREBASE_SERVICE_ACCOUNT_PATH, "utf8")
     );
@@ -74,7 +74,7 @@ if (!MP_ACCESS_TOKEN) {
 const client = new MercadoPagoConfig({ accessToken: MP_ACCESS_TOKEN });
 console.log(`🔌 Mercado Pago configurado (MODE=${MODE})`);
 
-// Routes /create_payment e /webhook seguem iguais
+// ----- Rotas de API -----
 app.post("/create_payment", async (req, res) => {
   try {
     const { amount, title, presentId, buyerEmail } = req.body;
@@ -191,8 +191,20 @@ app.post("/webhook", async (req, res) => {
   }
 });
 
-app.get("/", (req, res) => res.send("✅ Wedding Server rodando"));
+// ----- Health check -----
+app.get("/health", (req, res) => res.send("✅ Wedding Server rodando"));
 
-// start
+// ----- Serve React frontend com SPA fallback -----
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const frontendBuildPath = path.join(__dirname, "../dist"); // ajuste conforme seu build
+
+app.use(express.static(frontendBuildPath));
+
+app.get("*", (req, res) => {
+  res.sendFile(path.join(frontendBuildPath, "index.html"));
+});
+
+// ----- Start server -----
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => console.log(`🚀 Server rodando na porta ${PORT}`));
