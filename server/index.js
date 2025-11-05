@@ -22,23 +22,37 @@ app.use(
 
 // ----- Firebase Admin init -----
 // Prioriza variável de ambiente FIREBASE_SERVICE_ACCOUNT (JSON completo)
-const serviceAccountEnv = process.env.FIREBASE_SERVICE_ACCOUNT;
+let serviceAccount;
 
-if (!serviceAccountEnv) {
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  try {
+    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    console.log(
+      "🔒 Usando service account vindo de env (FIREBASE_SERVICE_ACCOUNT)."
+    );
+  } catch (err) {
+    console.error("❌ FIREBASE_SERVICE_ACCOUNT inválido (JSON):", err.message);
+    process.exit(1);
+  }
+} else if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
+  try {
+    // Só para desenvolvimento local
+    const fs = await import("fs");
+    serviceAccount = JSON.parse(
+      fs.readFileSync(process.env.FIREBASE_SERVICE_ACCOUNT_PATH, "utf8")
+    );
+    console.log(
+      "🔒 Usando service account do arquivo local:",
+      process.env.FIREBASE_SERVICE_ACCOUNT_PATH
+    );
+  } catch (err) {
+    console.error("❌ Falha ao ler service account local:", err.message);
+    process.exit(1);
+  }
+} else {
   console.error(
     "❌ Nenhuma credencial Firebase encontrada. Configure FIREBASE_SERVICE_ACCOUNT"
   );
-  process.exit(1);
-}
-
-let serviceAccount;
-try {
-  serviceAccount = JSON.parse(serviceAccountEnv);
-  console.log(
-    "🔒 Usando service account vindo de env (FIREBASE_SERVICE_ACCOUNT)."
-  );
-} catch (err) {
-  console.error("❌ FIREBASE_SERVICE_ACCOUNT inválido (JSON):", err.message);
   process.exit(1);
 }
 
@@ -49,7 +63,7 @@ const db = admin.firestore();
 console.log("✅ Conectado ao Firebase Firestore");
 
 // ----- Mercado Pago init -----
-const MODE = (process.env.MODE || "sandbox").toLowerCase(); // "sandbox" | "live"
+const MODE = (process.env.MODE || "sandbox").toLowerCase();
 const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN;
 if (!MP_ACCESS_TOKEN) {
   console.error(
@@ -60,7 +74,7 @@ if (!MP_ACCESS_TOKEN) {
 const client = new MercadoPagoConfig({ accessToken: MP_ACCESS_TOKEN });
 console.log(`🔌 Mercado Pago configurado (MODE=${MODE})`);
 
-// Utility: cria payment e retorna objeto padronizado
+// Routes /create_payment e /webhook seguem iguais
 app.post("/create_payment", async (req, res) => {
   try {
     const { amount, title, presentId, buyerEmail } = req.body;
@@ -129,17 +143,13 @@ app.post("/create_payment", async (req, res) => {
   }
 });
 
-// Webhook do Mercado Pago
 app.post("/webhook", async (req, res) => {
   try {
     const body = req.body;
     console.log("📩 Webhook MP recebido:", body);
 
     let paymentId = body?.data?.id || body?.id || body?.resource?.id;
-    if (!paymentId) {
-      console.warn("Webhook sem payment id.");
-      return res.sendStatus(200);
-    }
+    if (!paymentId) return res.sendStatus(200);
 
     try {
       const mpPayment = await new Payment(client).get(paymentId);
@@ -181,7 +191,6 @@ app.post("/webhook", async (req, res) => {
   }
 });
 
-// health check
 app.get("/", (req, res) => res.send("✅ Wedding Server rodando"));
 
 // start
