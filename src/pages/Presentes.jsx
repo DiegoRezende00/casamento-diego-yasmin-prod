@@ -18,7 +18,6 @@ export default function Presentes() {
   }, []);
 
   const reservar = async (p) => {
-    // p: presente object
     if (p.payment?.status === "pending") {
       alert("Este presente está aguardando pagamento. Tente novamente mais tarde.");
       return;
@@ -33,18 +32,27 @@ export default function Presentes() {
 
     try {
       setLoadingPayment(true);
-      const resp = await axios.post(`${process.env.REACT_APP_API_URL || ""}/create_payment`, {
+      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:4000";
+      const resp = await axios.post(`${apiUrl}/create_payment`, {
         presentId: p.id,
         amount: p.preco,
         title: p.nome,
-      });
-      const { paymentId, qr_code, qr_base64, expiresAt } = resp.data;
+      }, { timeout: 15000 });
 
-      // Redireciona para a página de pagamento, enviando presentId e paymentId
+      const { paymentId, qr_code, qr_base64, expiresAt } = resp.data;
+      // redireciona para rota /pagamento (crie se ainda não existe)
       navigate("/pagamento", { state: { presentId: p.id, paymentId, qr_code, qr_base64, expiresAt } });
     } catch (err) {
       console.error("Erro criando pagamento:", err);
-      alert("Erro ao criar pagamento. Tente novamente.");
+      // Mostra mensagem mais informativa ao usuário
+      if (err?.response?.data) {
+        console.error("Resposta servidor:", err.response.data);
+        alert("Erro ao criar pagamento: " + (err.response.data.detail || err.response.data.error || JSON.stringify(err.response.data)));
+      } else if (err?.message) {
+        alert("Erro ao criar pagamento: " + err.message);
+      } else {
+        alert("Erro ao criar pagamento. Tente novamente.");
+      }
     } finally {
       setLoadingPayment(false);
     }
@@ -77,7 +85,7 @@ export default function Presentes() {
               <button disabled style={{ backgroundColor: "#f0ad4e", color: "#fff", padding: "10px 15px", borderRadius: 8 }}>Aguardando pagamento</button>
             ) : (
               <button onClick={() => reservar(p)} disabled={loadingPayment} style={{ backgroundColor: "#2e7d32", color: "#fff", padding: "10px 15px", borderRadius: 8 }}>
-                Reservar 🎁
+                {loadingPayment ? "Gerando..." : "Reservar 🎁"}
               </button>
             )}
           </div>
