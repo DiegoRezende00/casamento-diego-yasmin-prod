@@ -1,56 +1,42 @@
 import { useState, useEffect } from "react";
-import { db } from "../firebaseConfig";
-import { collection, addDoc, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot, addDoc } from "firebase/firestore";
+import { db } from "../firebase";
+import ModalRecado from "../components/ModalRecado";
+import "./Mural.css";
 
-function Mural() {
-  const [nome, setNome] = useState("");
-  const [mensagem, setMensagem] = useState("");
+export default function Mural() {
   const [recados, setRecados] = useState([]);
+  const [modalOpen, setModalOpen] = useState(false);
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "recados"), (snapshot) => {
-      const dados = snapshot.docs.map((doc) => doc.data());
-      setRecados(dados);
+      setRecados(snapshot.docs.map((doc) => doc.data()));
     });
     return () => unsub();
   }, []);
 
-  const enviarRecado = async () => {
-    if (!nome || !mensagem) return alert("Preencha todos os campos!");
-    await addDoc(collection(db, "recados"), {
-      nome,
-      mensagem,
-      criadoEm: new Date(),
-    });
-    setNome("");
-    setMensagem("");
-  };
-
   return (
-    <div>
-      <h2>💌 Mural de Recados</h2>
-      <input
-        value={nome}
-        onChange={(e) => setNome(e.target.value)}
-        placeholder="Seu nome"
-      />
-      <textarea
-        value={mensagem}
-        onChange={(e) => setMensagem(e.target.value)}
-        placeholder="Deixe seu recado para os noivos"
-      />
-      <button onClick={enviarRecado}>Enviar</button>
+    <div className="mural-container">
+      <h2>Mural de Recados 💌</h2>
+      {recados.length === 0 ? (
+        <p>Seja o primeiro a deixar um recado para Diego & Yasmin!</p>
+      ) : (
+        <div className="recados-lista">
+          {recados.map((r, i) => (
+            <div className="recado" key={i}>
+              <h4>{r.nome}</h4>
+              <p>{r.mensagem}</p>
+              {r.email && <span>{r.email}</span>}
+            </div>
+          ))}
+        </div>
+      )}
 
-      <div>
-        {recados.map((r, i) => (
-          <div key={i} className="card">
-            <strong>{r.nome}</strong>
-            <p>{r.mensagem}</p>
-          </div>
-        ))}
-      </div>
+      <button className="btn-adicionar" onClick={() => setModalOpen(true)}>
+        + Adicione seu recado
+      </button>
+
+      {modalOpen && <ModalRecado onClose={() => setModalOpen(false)} />}
     </div>
   );
 }
-
-export default Mural;

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { db } from "../firebaseConfig";
+import { db } from "../firebase";
 import { collection, getDocs, updateDoc, doc, onSnapshot } from "firebase/firestore";
 
 export default function Presentes() {

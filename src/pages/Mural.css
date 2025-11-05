@@ -1,0 +1,50 @@
+.mural-container {
+  text-align: center;
+  padding: 2rem;
+  color: #1b5e20;
+  background-color: #f9f9f9;
+  min-height: 80vh;
+}
+
+.mural-container h1 {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+}
+
+.recados-lista {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.recado {
+  background-color: white;
+  border: 1px solid #c8e6c9;
+  padding: 1rem;
+  width: 90%;
+  max-width: 600px;
+  border-radius: 10px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.recado strong {
+  color: #2e7d32;
+}
+
+.botao-recado {
+  background-color: #1b5e20;
+  color: white;
+  border: none;
+  padding: 0.8rem 1.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  margin-top: 1rem;
+  transition: background-color 0.3s ease;
+}
+
+.botao-recado:hover {
+  background-color: #2e7d32;
+}
