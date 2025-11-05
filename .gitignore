@@ -27,3 +27,4 @@ dist-ssr
 server/service-account.json
 .env
 server/.env
+.env.local
