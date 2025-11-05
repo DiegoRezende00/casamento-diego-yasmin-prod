@@ -14,7 +14,7 @@ const Casamento = () => {
       <div className="mapa-container">
         <iframe
           title="Local do Casamento"
-          src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3671.667320787958!2d-47.66299732540165!3d-22.92504843968578!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x94c6316ee5c80b25%3A0x241f7e8e4a44a6e4!2sEspa%C3%A7o%20Caplua!5e0!3m2!1spt-BR!2sbr!4v1699884069119!5m2!1spt-BR!2sbr"
+          src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3678.4384783394485!2d-47.5846155!3d-22.786210999999998!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x94c6256ed0a3e573%3A0xaab5a960bb7a8a29!2sTaquaral%20Caf%C3%A9!5e0!3m2!1spt-BR!2sbr!4v1762302338422!5m2!1spt-BR!2sbr"
           allowFullScreen=""
           loading="lazy"
         ></iframe>
@@ -25,7 +25,7 @@ const Casamento = () => {
           <strong>Data:</strong> 20 de dezembro de 2025 — 16h30
         </p>
         <p>
-          <strong>Local:</strong> Espaço Caplua — Piracicaba, SP, Brasil
+          <strong>Local:</strong> Rodovia do Açúcar SP - KM 154,5 - SN - Batistada, Piracicaba - SP, 13423-070
         </p>
 
         <div className="botoes-container">

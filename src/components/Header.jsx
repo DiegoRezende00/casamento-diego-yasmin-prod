@@ -1,23 +1,37 @@
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import "./Header.css";
 
-function Header() {
+const Header = () => {
+  const [menuAberto, setMenuAberto] = useState(false);
+
+  const toggleMenu = () => {
+    setMenuAberto(!menuAberto);
+  };
+
   return (
-    <header className="header">
-      <div className="logo">
-        💚 <strong>Diego & Yasmin</strong>
+    <header className="header-container">
+      <div className="header-logo">
+        <Link to="/" className="logo-text">
+          D & Y
+        </Link>
       </div>
-      <nav>
-        <ul>
-          <li><Link to="/">Início</Link></li>
-          <li><Link to="/presentes">Lista de Presentes</Link></li>
-          <li><Link to="/presenca">Confirmar Presença</Link></li>
-          <li><Link to="/mural">Mural de Recados</Link></li>
-          <li><Link to="/casamento">Casamento</Link></li>
-        </ul>
+
+      <nav className={`header-nav ${menuAberto ? "ativo" : ""}`}>
+        <Link to="/" onClick={() => setMenuAberto(false)}>Início</Link>
+        <Link to="/casamento" onClick={() => setMenuAberto(false)}>Casamento</Link>
+        <Link to="/presenca" onClick={() => setMenuAberto(false)}>Confirmar Presença</Link>
+        <Link to="/presentes" onClick={() => setMenuAberto(false)}>Lista de Presentes</Link>
+        <Link to="/mural" onClick={() => setMenuAberto(false)}>Mural de Recados</Link>
       </nav>
+
+      <div className={`menu-toggle ${menuAberto ? "aberto" : ""}`} onClick={toggleMenu}>
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
     </header>
   );
-}
+};
 
 export default Header;

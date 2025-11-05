@@ -4,7 +4,7 @@ import presenteImg from "../assets/presente.jpg"; // imagem da seção de presen
 import fundoSite from "../assets/fundo-site.jpg"; // imagem de fundo enviada
 
 const Home = () => {
-  const casamentoData = new Date("2025-12-20T16:30:00");
+  const casamentoData = new Date("2026-07-12T16:30:00");
   const [diasRestantes, setDiasRestantes] = useState(0);
 
   useEffect(() => {
@@ -31,7 +31,7 @@ const Home = () => {
           <h2 className="save-date-text">Save the Date</h2>
           <h1 className="nomes">Diego & Yasmin</h1>
           <p className="contador">
-            20.12.2025 — Faltam {diasRestantes} dias
+            12.07.2026 — Faltam {diasRestantes} dias
           </p>
         </section>
 
@@ -41,11 +41,10 @@ const Home = () => {
 
           <div className="evento-info">
             <p>
-              <span className="emoji">📅</span> 20 de dezembro de 2025 — 16h30
+              <span className="emoji">📅</span> 12 de julho de 2026 — 11h30
             </p>
             <p>
-              <span className="emoji">📍</span> Espaço Caplua — Piracicaba, SP,
-              Brasil
+              <span className="emoji">📍</span> Rodovia do Açúcar SP - KM 154,5 - SN - Batistada, Piracicaba - SP, 13423-070
             </p>
           </div>
 

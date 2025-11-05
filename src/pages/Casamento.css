@@ -1,58 +1,120 @@
+/* ===== CASAMENTO.CSS ===== */
+
 .casamento-container {
   text-align: center;
-  padding: 3rem 1rem;
-  background-color: #fdf9f6;
-  color: #4b3621;
+  padding: 40px 20px;
+  background-color: #fff8f0;
+  color: #444;
 }
 
 .casamento-container h1 {
-  font-family: "Playfair Display", serif;
   font-size: 2.2rem;
-  color: #b47b5f;
-  margin-bottom: 2rem;
+  color: #d87b5c;
+  margin-bottom: 24px;
 }
 
 .mapa-container {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 2rem;
-}
-
-.mapa-container iframe {
-  width: 90%;
+  width: 100%;
   max-width: 800px;
   height: 400px;
-  border: none;
+  margin: 0 auto 30px;
   border-radius: 12px;
+  overflow: hidden;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
 }
 
+.mapa-container iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
 .info-container {
+  max-width: 700px;
+  margin: 0 auto;
   font-size: 1.1rem;
-  line-height: 1.8;
+  line-height: 1.6;
+}
+
+.info-container p {
+  margin: 10px 0;
 }
 
 .botoes-container {
-  margin-top: 2rem;
   display: flex;
   justify-content: center;
-  gap: 1rem;
+  gap: 20px;
+  margin-top: 20px;
   flex-wrap: wrap;
 }
 
 .botao-maps,
 .botao-agenda {
-  background-color: #b47b5f;
+  background-color: #d87b5c;
   color: white;
   border: none;
-  padding: 0.9rem 1.8rem;
+  padding: 12px 20px;
   border-radius: 8px;
   cursor: pointer;
-  font-weight: bold;
-  transition: all 0.3s ease;
+  font-weight: 500;
+  transition: background-color 0.3s ease;
 }
 
 .botao-maps:hover,
 .botao-agenda:hover {
-  background-color: #a76b4d;
+  background-color: #b9674c;
+}
+
+/* ====== RESPONSIVIDADE ====== */
+
+/* Tablets */
+@media (max-width: 900px) {
+  .casamento-container {
+    padding: 30px 16px;
+  }
+
+  .mapa-container {
+    height: 350px;
+  }
+
+  .info-container {
+    font-size: 1rem;
+  }
+
+  .botoes-container {
+    gap: 14px;
+  }
+
+  .botao-maps,
+  .botao-agenda {
+    padding: 10px 16px;
+    font-size: 0.95rem;
+  }
+}
+
+/* Celulares */
+@media (max-width: 600px) {
+  .casamento-container h1 {
+    font-size: 1.8rem;
+  }
+
+  .mapa-container {
+    height: 280px;
+  }
+
+  .info-container {
+    font-size: 0.95rem;
+    padding: 0 10px;
+  }
+
+  .botoes-container {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .botao-maps,
+  .botao-agenda {
+    width: 100%;
+    font-size: 0.9rem;
+  }
 }
