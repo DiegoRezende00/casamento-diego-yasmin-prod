@@ -41,7 +41,7 @@ const Home = () => {
 
           <div className="evento-info">
             <p>
-              <span className="emoji">📅</span> 12 de julho de 2026 — 11h00
+              <span className="emoji">📅</span> 12 de julho de 2026 — 11h30
             </p>
             <p>
               <span className="emoji">📍</span> Rodovia do Açúcar SP - KM 154,5 - SN - Batistada, Piracicaba - SP, 13423-070
