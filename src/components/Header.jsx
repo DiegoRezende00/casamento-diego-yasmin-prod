@@ -22,6 +22,7 @@ const Header = () => {
         <Link to="/presentes" onClick={() => setMenuAberto(false)}>Lista de Presentes</Link>
         <Link to="/presenca" onClick={() => setMenuAberto(false)}>Confirmar Presença</Link>        
         <Link to="/mural" onClick={() => setMenuAberto(false)}>Mural de Recados</Link>
+        
         <Link to="/casamento" onClick={() => setMenuAberto(false)}>Casamento</Link>
       </nav>
 
