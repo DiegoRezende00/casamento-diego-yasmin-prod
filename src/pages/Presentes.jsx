@@ -32,7 +32,12 @@ export default function Presentes() {
 
     try {
       setLoadingPayment(true);
-      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:4000";
+      // usa VITE_API_URL se estiver definido (build-time)
+      // caso contrário, se a página foi carregada no mesmo host do backend, usa path relativo
+      const apiUrl = import.meta.env.VITE_API_URL?.replace(/\/$/, "") 
+      || (window.location.origin.includes("onrender.com") || window.location.origin.includes("vercel.app")
+      ? "" // path relativo -> same-origin: POST to /create_payment
+      : "https://casamento-diego-yasmin-prod-1.onrender.com"); // ou seu backend
       const resp = await axios.post(`${apiUrl}/create_payment`, {
         presentId: p.id,
         amount: p.preco,
