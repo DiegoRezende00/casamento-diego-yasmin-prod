@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { db } from "../firebase";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot, doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import axios from "axios";
 
 export default function Presentes() {
@@ -11,7 +11,19 @@ export default function Presentes() {
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "presents"), (snapshot) => {
-      const lista = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      const lista = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        // 🔹 Checar se passou 1 hora e desbloquear
+        if (data.payment?.blockedAt) {
+          const blockedTime = data.payment.blockedAt.toDate ? data.payment.blockedAt.toDate() : new Date(data.payment.blockedAt);
+          if (Date.now() - blockedTime.getTime() > 3600_000 && data.payment.status !== "paid") {
+            data.reservado = false;
+          } else if (!data.reservado) {
+            data.reservado = true;
+          }
+        }
+        return { id: doc.id, ...data };
+      });
       setPresentes(lista);
     });
     return () => unsub();
@@ -42,10 +54,8 @@ export default function Presentes() {
         }
       );
 
-      // 🔹 Log completo da resposta para debug
       console.log("Resposta completa do backend:", data);
 
-      // ✅ Ajuste: agora usamos qr_base64 diretamente
       if (data.qr_base64) {
         setQrCode(`data:image/png;base64,${data.qr_base64}`);
       } else if (data.init_point) {
@@ -54,8 +64,15 @@ export default function Presentes() {
         console.error("Erro: resposta inesperada do servidor", data);
         alert("Erro: resposta inesperada do servidor. Confira o console.");
       }
+
+      // 🔹 Bloquear botão imediatamente
+      const presentRef = doc(db, "presents", p.id);
+      await updateDoc(presentRef, {
+        reservado: true,
+        "payment.blockedAt": serverTimestamp(),
+      });
+
     } catch (err) {
-      // 🔹 Log detalhado do erro
       if (err.response) {
         console.error("Erro no servidor:", err.response.data, err.response.status);
       } else if (err.request) {
@@ -67,6 +84,13 @@ export default function Presentes() {
     } finally {
       setLoadingId(null);
     }
+  };
+
+  const copiarQRCode = () => {
+    if (!selectedGift?.payment?.qr_code) return;
+    navigator.clipboard.writeText(selectedGift.payment.qr_code)
+      .then(() => alert("QR Code copiado para a área de transferência!"))
+      .catch(() => alert("Erro ao copiar o QR Code."));
   };
 
   return (
@@ -192,6 +216,35 @@ export default function Presentes() {
             <p style={{ marginTop: "1rem" }}>
               Escaneie com o app do Mercado Pago para concluir o pagamento.
             </p>
+            {selectedGift.payment?.qr_code && (
+              <div style={{ marginTop: "1rem" }}>
+                <input
+                  type="text"
+                  readOnly
+                  value={selectedGift.payment.qr_code}
+                  style={{
+                    width: "100%",
+                    padding: "8px",
+                    borderRadius: 6,
+                    border: "1px solid #ccc",
+                    textAlign: "center",
+                  }}
+                />
+                <button
+                  onClick={copiarQRCode}
+                  style={{
+                    marginTop: 8,
+                    backgroundColor: "#2e7d32",
+                    color: "#fff",
+                    padding: "6px 12px",
+                    borderRadius: 6,
+                    cursor: "pointer",
+                  }}
+                >
+                  Copiar QR Code
+                </button>
+              </div>
+            )}
             <button
               onClick={() => setQrCode(null)}
               style={{
