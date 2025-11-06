@@ -56,6 +56,7 @@ export default function Presentes() {
 
       console.log("Resposta completa do backend:", data);
 
+      // 🔹 Salvar QR Code em base64
       if (data.qr_base64) {
         setQrCode(`data:image/png;base64,${data.qr_base64}`);
       } else if (data.init_point) {
@@ -70,6 +71,7 @@ export default function Presentes() {
       await updateDoc(presentRef, {
         reservado: true,
         "payment.blockedAt": serverTimestamp(),
+        "payment.qr_code": data.qr_code || null, // salva o qr_code da API para copiar
       });
 
     } catch (err) {
@@ -216,9 +218,8 @@ export default function Presentes() {
             <p style={{ marginTop: "1rem" }}>
               Escaneie com o app do Mercado Pago para concluir o pagamento.
             </p>
-            <p style={{ marginTop: "1rem" }}>
-              {selectedGift.qr_code}
-            </p>
+
+            {/* Campo de texto para qr_code */}
             {selectedGift.payment?.qr_code && (
               <div style={{ marginTop: "1rem" }}>
                 <input
@@ -248,6 +249,7 @@ export default function Presentes() {
                 </button>
               </div>
             )}
+
             <button
               onClick={() => setQrCode(null)}
               style={{
