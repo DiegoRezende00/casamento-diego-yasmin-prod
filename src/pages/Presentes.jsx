@@ -43,7 +43,6 @@ export default function Presentes() {
     try {
       setLoadingId(p.id);
       setQrCode(null);
-      setSelectedGift(p);
 
       const { data } = await axios.post(
         `${import.meta.env.VITE_API_URL}/create_payment`,
@@ -56,7 +55,7 @@ export default function Presentes() {
 
       console.log("Resposta completa do backend:", data);
 
-      // 🔹 Salvar QR Code em base64
+      // 🔹 Salvar QR Code como imagem base64
       if (data.qr_base64) {
         setQrCode(`data:image/png;base64,${data.qr_base64}`);
       } else if (data.init_point) {
@@ -66,12 +65,16 @@ export default function Presentes() {
         alert("Erro: resposta inesperada do servidor. Confira o console.");
       }
 
-      // 🔹 Bloquear botão imediatamente
+      // 🔹 Salvar QR Code de texto no selectedGift para mostrar no modal
+      const qrCodeText = data.qr_code || null;
+      setSelectedGift({ ...p, payment: { qr_code: qrCodeText } });
+
+      // 🔹 Bloquear botão imediatamente no Firestore
       const presentRef = doc(db, "presents", p.id);
       await updateDoc(presentRef, {
         reservado: true,
         "payment.blockedAt": serverTimestamp(),
-        "payment.qr_code": data.qr_code || null, // salva o qr_code da API para copiar
+        "payment.qr_code": qrCodeText,
       });
 
     } catch (err) {
@@ -219,7 +222,7 @@ export default function Presentes() {
               Escaneie com o app do Mercado Pago para concluir o pagamento.
             </p>
 
-            {/* Campo de texto para qr_code */}
+            {/* 🔹 Campo de texto com botão copiar */}
             {selectedGift.payment?.qr_code && (
               <div style={{ marginTop: "1rem" }}>
                 <input
