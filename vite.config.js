@@ -1,7 +1,10 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
 
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-})
+  base: "./", // 🔥 essencial para funcionar no Vercel
+  build: {
+    outDir: "dist", // garante que o build vai pra pasta certa
+  },
+});
