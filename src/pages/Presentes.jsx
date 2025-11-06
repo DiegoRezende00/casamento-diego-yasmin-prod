@@ -6,6 +6,8 @@ import axios from "axios";
 export default function Presentes() {
   const [presentes, setPresentes] = useState([]);
   const [loadingId, setLoadingId] = useState(null);
+  const [qrCode, setQrCode] = useState(null);
+  const [selectedGift, setSelectedGift] = useState(null);
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "presents"), (snapshot) => {
@@ -28,6 +30,9 @@ export default function Presentes() {
 
     try {
       setLoadingId(p.id);
+      setQrCode(null);
+      setSelectedGift(p);
+
       const { data } = await axios.post(
         `${import.meta.env.VITE_API_URL}/create_payment`,
         {
@@ -36,8 +41,18 @@ export default function Presentes() {
           presentId: p.id,
         }
       );
-      // Redireciona pro checkout Mercado Pago
-      window.location.href = `https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=${data.id}`;
+
+      // 🔹 Exibe o QR Code retornado pela API
+      if (data.point_of_interaction?.transaction_data?.qr_code_base64) {
+        setQrCode(
+          `data:image/png;base64,${data.point_of_interaction.transaction_data.qr_code_base64}`
+        );
+      } else if (data.init_point) {
+        // Fallback: exibir link se não tiver QR
+        window.open(data.init_point, "_blank");
+      } else {
+        alert("Erro: resposta inesperada do servidor.");
+      }
     } catch (err) {
       console.error("Erro criando pagamento:", err);
       alert("Erro ao iniciar o pagamento. Tente novamente.");
@@ -124,6 +139,67 @@ export default function Presentes() {
           </div>
         ))}
       </div>
+
+      {/* Modal de QR Code */}
+      {qrCode && selectedGift && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            backgroundColor: "rgba(0,0,0,0.6)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 1000,
+          }}
+          onClick={() => setQrCode(null)}
+        >
+          <div
+            style={{
+              backgroundColor: "#fff",
+              padding: "2rem",
+              borderRadius: "12px",
+              textAlign: "center",
+              boxShadow: "0 8px 20px rgba(0,0,0,0.3)",
+              maxWidth: "400px",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ color: "#2e7d32" }}>
+              Pagamento de {selectedGift.nome}
+            </h3>
+            <img
+              src={qrCode}
+              alt="QR Code Pagamento"
+              style={{
+                marginTop: "1rem",
+                width: "250px",
+                height: "250px",
+                borderRadius: "10px",
+              }}
+            />
+            <p style={{ marginTop: "1rem" }}>
+              Escaneie com o app do Mercado Pago para concluir o pagamento.
+            </p>
+            <button
+              onClick={() => setQrCode(null)}
+              style={{
+                marginTop: "1rem",
+                backgroundColor: "#2e7d32",
+                color: "#fff",
+                padding: "8px 16px",
+                borderRadius: 8,
+                cursor: "pointer",
+              }}
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
