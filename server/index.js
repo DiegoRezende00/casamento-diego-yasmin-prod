@@ -54,13 +54,30 @@ const mp = new MercadoPagoConfig({
 // ======================
 // 🌐 Configuração CORS
 // ======================
-const FRONTEND_ORIGIN =
-  process.env.FRONTEND_ORIGIN ||
-  "https://site-casamento-diego-yasmin.vercel.app";
+const allowedOrigins = [
+  process.env.FRONTEND_ORIGIN, // domínio principal da Vercel
+  "https://casamento-diego-yasmin-prod.vercel.app", // domínio principal
+  "http://localhost:5173", // para desenvolvimento local
+];
+
+// Permitir também subdomínios temporários da Vercel (preview deploys)
+const vercelPattern =
+  /^https:\/\/casamento-diego-yasmin-prod-[a-z0-9]+\.vercel\.app$/;
 
 app.use(
   cors({
-    origin: [FRONTEND_ORIGIN, "http://localhost:5173"],
+    origin: function (origin, callback) {
+      if (
+        !origin ||
+        allowedOrigins.includes(origin) ||
+        vercelPattern.test(origin)
+      ) {
+        callback(null, true);
+      } else {
+        console.log("❌ Bloqueado por CORS:", origin);
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     methods: ["GET", "POST"],
     credentials: true,
   })
@@ -123,5 +140,7 @@ app.post("/create_payment", async (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ Servidor rodando na porta ${PORT}`);
-  console.log(`🌍 Frontend permitido: ${FRONTEND_ORIGIN}`);
+  console.log(`🌍 Domínios permitidos (CORS):`);
+  allowedOrigins.forEach((o) => console.log("   -", o));
+  console.log("   - (subdomínios temporários da Vercel habilitados)");
 });
