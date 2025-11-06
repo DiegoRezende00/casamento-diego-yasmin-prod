@@ -216,6 +216,9 @@ export default function Presentes() {
             <p style={{ marginTop: "1rem" }}>
               Escaneie com o app do Mercado Pago para concluir o pagamento.
             </p>
+            <p style={{ marginTop: "1rem" }}>
+              {selectedGift.qr_code}
+            </p>
             {selectedGift.payment?.qr_code && (
               <div style={{ marginTop: "1rem" }}>
                 <input
