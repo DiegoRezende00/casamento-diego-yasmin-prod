@@ -42,20 +42,32 @@ export default function Presentes() {
         }
       );
 
-      // 🔹 Exibe o QR Code retornado pela API
+      // 🔹 Log completo da resposta para debug
+      console.log("Resposta completa do backend:", data);
+
       if (data.point_of_interaction?.transaction_data?.qr_code_base64) {
         setQrCode(
           `data:image/png;base64,${data.point_of_interaction.transaction_data.qr_code_base64}`
         );
       } else if (data.init_point) {
-        // Fallback: exibir link se não tiver QR
         window.open(data.init_point, "_blank");
       } else {
-        alert("Erro: resposta inesperada do servidor.");
+        console.error("Erro: resposta inesperada do servidor", data);
+        alert("Erro: resposta inesperada do servidor. Confira o console.");
       }
     } catch (err) {
-      console.error("Erro criando pagamento:", err);
-      alert("Erro ao iniciar o pagamento. Tente novamente.");
+      // 🔹 Log detalhado do erro
+      if (err.response) {
+        // Erro retornado pelo servidor
+        console.error("Erro no servidor:", err.response.data, err.response.status);
+      } else if (err.request) {
+        // Request foi feito, mas não houve resposta
+        console.error("Erro na requisição (sem resposta):", err.request);
+      } else {
+        // Outro tipo de erro
+        console.error("Erro inesperado:", err.message);
+      }
+      alert("Erro ao iniciar o pagamento. Veja o console para detalhes.");
     } finally {
       setLoadingId(null);
     }
