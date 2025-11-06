@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { db } from "../firebase";
-import { collection, onSnapshot, doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { collection, onSnapshot } from "firebase/firestore";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
 export default function Presentes() {
   const [presentes, setPresentes] = useState([]);
@@ -9,21 +10,11 @@ export default function Presentes() {
   const [qrCode, setQrCode] = useState(null);
   const [selectedGift, setSelectedGift] = useState(null);
 
+  const navigate = useNavigate();
+
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "presents"), (snapshot) => {
-      const lista = snapshot.docs.map((doc) => {
-        const data = doc.data();
-        // 🔹 Checar se passou 1 hora e desbloquear
-        if (data.payment?.blockedAt) {
-          const blockedTime = data.payment.blockedAt.toDate ? data.payment.blockedAt.toDate() : new Date(data.payment.blockedAt);
-          if (Date.now() - blockedTime.getTime() > 3600_000 && data.payment.status !== "paid") {
-            data.reservado = false;
-          } else if (!data.reservado) {
-            data.reservado = true;
-          }
-        }
-        return { id: doc.id, ...data };
-      });
+      const lista = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       setPresentes(lista);
     });
     return () => unsub();
@@ -54,43 +45,27 @@ export default function Presentes() {
         }
       );
 
-      console.log("Resposta completa do backend:", data);
-
-      if (data.qr_base64) {
-        setQrCode(`data:image/png;base64,${data.qr_base64}`);
-      } else if (data.init_point) {
-        window.open(data.init_point, "_blank");
-      } else {
-        console.error("Erro: resposta inesperada do servidor", data);
-        alert("Erro: resposta inesperada do servidor. Confira o console.");
-      }
-
-      // 🔹 Bloquear botão imediatamente
-      const presentRef = doc(db, "presents", p.id);
-      await updateDoc(presentRef, {
-        reservado: true,
-        "payment.blockedAt": serverTimestamp(),
+      // Bloqueio do botão: reserva temporária por 1 hora
+      await axios.patch(`${import.meta.env.VITE_API_URL}/reserve_temp/${p.id}`, {
+        expiresAt: Date.now() + 60 * 60 * 1000,
       });
 
+      // Redireciona para a página de pagamento
+      navigate("/pagamento", {
+        state: {
+          presentId: p.id,
+          paymentId: data.id,
+          qr_code: data.point_of_interaction?.transaction_data?.qr_code,
+          qr_base64: data.point_of_interaction?.transaction_data?.qr_code_base64,
+          expiresAt: data.expiresAt || Date.now() + 60 * 60 * 1000,
+        },
+      });
     } catch (err) {
-      if (err.response) {
-        console.error("Erro no servidor:", err.response.data, err.response.status);
-      } else if (err.request) {
-        console.error("Erro na requisição (sem resposta):", err.request);
-      } else {
-        console.error("Erro inesperado:", err.message);
-      }
-      alert("Erro ao iniciar o pagamento. Veja o console para detalhes.");
+      console.error("Erro criando pagamento:", err);
+      alert("Erro ao iniciar o pagamento. Tente novamente.");
     } finally {
       setLoadingId(null);
     }
-  };
-
-  const copiarQRCode = () => {
-    if (!selectedGift?.payment?.qr_code) return;
-    navigator.clipboard.writeText(selectedGift.payment.qr_code)
-      .then(() => alert("QR Code copiado para a área de transferência!"))
-      .catch(() => alert("Erro ao copiar o QR Code."));
   };
 
   return (
@@ -171,96 +146,6 @@ export default function Presentes() {
           </div>
         ))}
       </div>
-
-      {/* Modal de QR Code */}
-      {qrCode && selectedGift && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100vw",
-            height: "100vh",
-            backgroundColor: "rgba(0,0,0,0.6)",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: 1000,
-          }}
-          onClick={() => setQrCode(null)}
-        >
-          <div
-            style={{
-              backgroundColor: "#fff",
-              padding: "2rem",
-              borderRadius: "12px",
-              textAlign: "center",
-              boxShadow: "0 8px 20px rgba(0,0,0,0.3)",
-              maxWidth: "400px",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 style={{ color: "#2e7d32" }}>
-              Pagamento de {selectedGift.nome}
-            </h3>
-            <img
-              src={qrCode}
-              alt="QR Code Pagamento"
-              style={{
-                marginTop: "1rem",
-                width: "250px",
-                height: "250px",
-                borderRadius: "10px",
-              }}
-            />
-            <p style={{ marginTop: "1rem" }}>
-              Escaneie com o app do Mercado Pago para concluir o pagamento.
-            </p>
-            {selectedGift.payment?.qr_code && (
-              <div style={{ marginTop: "1rem" }}>
-                <input
-                  type="text"
-                  readOnly
-                  value={selectedGift.payment.qr_code}
-                  style={{
-                    width: "100%",
-                    padding: "8px",
-                    borderRadius: 6,
-                    border: "1px solid #ccc",
-                    textAlign: "center",
-                  }}
-                />
-                <button
-                  onClick={copiarQRCode}
-                  style={{
-                    marginTop: 8,
-                    backgroundColor: "#2e7d32",
-                    color: "#fff",
-                    padding: "6px 12px",
-                    borderRadius: 6,
-                    cursor: "pointer",
-                  }}
-                >
-                  Copiar QR Code
-                </button>
-              </div>
-            )}
-            <button
-              onClick={() => setQrCode(null)}
-              style={{
-                marginTop: "1rem",
-                backgroundColor: "#2e7d32",
-                color: "#fff",
-                padding: "8px 16px",
-                borderRadius: 8,
-                cursor: "pointer",
-              }}
-            >
-              Fechar
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
