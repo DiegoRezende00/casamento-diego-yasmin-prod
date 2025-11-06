@@ -15,22 +15,21 @@ export default function Pagamento() {
       navigate("/presents");
       return;
     }
-    // Listen Firestore present doc to update status in real time
+
+    // Atualiza status e tempo restante em tempo real
     const unsubscribe = onSnapshot(doc(db, "presents", presentId), (snap) => {
       const data = snap.data();
-      const st = data?.payment?.status;
-      setStatus(st);
-      const exp = data?.payment?.expiresAt;
+      setStatus(data?.payment?.status || null);
+
+      const exp = data?.payment?.expiresAt || expiresAt;
       if (exp) {
         const expiresMs = exp.toDate ? exp.toDate().getTime() : new Date(exp).getTime();
         setTimeLeft(expiresMs - Date.now());
-      } else if (expiresAt) {
-        setTimeLeft(expiresAt - Date.now());
       }
     });
+
     return () => unsubscribe();
-    // eslint-disable-next-line
-  }, [presentId]);
+  }, [presentId, expiresAt, navigate]);
 
   useEffect(() => {
     if (timeLeft === null) return;
@@ -75,19 +74,56 @@ export default function Pagamento() {
         </div>
       ) : (
         <div>
-          {qr_base64 ? (
-            <img src={`data:image/png;base64,${qr_base64}`} alt="QR Code" style={{ maxWidth: 300 }} />
-          ) : qr_code ? (
-            <div style={{ maxWidth: 300, wordBreak: "break-all", margin: "0 auto", background: "#fff", padding: 12, borderRadius: 8 }}>
-              <p style={{ fontSize: 12 }}>{qr_code}</p>
-            </div>
-          ) : (
-            <p>Gerando QR Code...</p>
+          {qr_base64 && (
+            <img
+              src={`data:image/png;base64,${qr_base64}`}
+              alt="QR Code"
+              style={{ maxWidth: 300 }}
+            />
           )}
 
-          <p style={{ marginTop: 16 }}>Tempo restante para pagamento: <strong>{formatTime(timeLeft)}</strong></p>
-          <p style={{ fontSize: 14, color: "#666" }}>Aguarde a confirmação — atualizaremos automaticamente.</p>
-          <button onClick={() => navigate("/presents")} style={{ marginTop: 12 }}>Cancelar / Voltar</button>
+          {qr_code && (
+            <div style={{ marginTop: 16 }}>
+              <input
+                type="text"
+                readOnly
+                value={qr_code}
+                style={{
+                  width: "100%",
+                  padding: 8,
+                  borderRadius: 6,
+                  border: "1px solid #ccc",
+                  textAlign: "center",
+                }}
+              />
+              <button
+                onClick={() => navigator.clipboard.writeText(qr_code)}
+                style={{
+                  marginTop: 8,
+                  backgroundColor: "#2e7d32",
+                  color: "#fff",
+                  padding: "6px 12px",
+                  borderRadius: 6,
+                  cursor: "pointer",
+                }}
+              >
+                Copiar QR Code
+              </button>
+            </div>
+          )}
+
+          <p style={{ marginTop: 16 }}>
+            Tempo restante para pagamento: <strong>{formatTime(timeLeft)}</strong>
+          </p>
+          <p style={{ fontSize: 14, color: "#666" }}>
+            Aguarde a confirmação — atualizaremos automaticamente.
+          </p>
+          <button
+            onClick={() => navigate("/presents")}
+            style={{ marginTop: 12 }}
+          >
+            Cancelar / Voltar
+          </button>
         </div>
       )}
     </div>
