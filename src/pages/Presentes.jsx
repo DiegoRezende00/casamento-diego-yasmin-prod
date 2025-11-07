@@ -10,14 +10,15 @@ export default function Presentes() {
   const [selectedGift, setSelectedGift] = useState(null);
   const [copyCode, setCopyCode] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
+  const [fadeOut, setFadeOut] = useState(false);
 
-  // 🧩 Escuta o Firestore em tempo real
+  // 🔹 Escuta o Firestore em tempo real
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "presents"), (snapshot) => {
       const lista = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       setPresentes(lista);
 
-      // 🔹 Se o presente selecionado foi pago → fecha o QR e mostra mensagem
+      // Se o presente selecionado foi pago → fecha o QR e mostra mensagem
       if (selectedGift) {
         const updatedGift = lista.find((p) => p.id === selectedGift.id);
 
@@ -30,9 +31,11 @@ export default function Presentes() {
           setCopyCode("");
           setShowSuccess(true);
 
-          // Mostra mensagem de sucesso por 3 segundos e recarrega
+          // Fade-out suave antes do reload
+          setTimeout(() => setFadeOut(true), 2000);
           setTimeout(() => {
             setShowSuccess(false);
+            setFadeOut(false);
             window.location.reload();
           }, 3000);
         }
@@ -42,10 +45,10 @@ export default function Presentes() {
     return () => unsub();
   }, [selectedGift]);
 
-  // 💰 Função de reserva e criação do pagamento
+  // 💰 Criar pagamento PIX
   const reservar = async (p) => {
     const confirm = window.confirm(
-      `Deseja reservar "${p.nome}" por R$ ${Number(p.preco).toFixed(2)}?`
+      `Deseja presentear "${p.nome}" por R$ ${Number(p.preco).toFixed(2)}?`
     );
     if (!confirm) return;
 
@@ -54,20 +57,19 @@ export default function Presentes() {
       setQrCode(null);
       setSelectedGift(p);
 
-      // Cria pagamento via backend
       const { data } = await axios.post(
         `${import.meta.env.VITE_API_URL}/create_payment`,
         { title: p.nome, amount: p.preco, presentId: p.id }
       );
 
-      // Exibe QRCode retornado
       if (data.qr_base64) setQrCode(`data:image/png;base64,${data.qr_base64}`);
       if (data.qr_code) setCopyCode(data.qr_code);
 
-      // 🔹 O backend já marca como "pending" — só registramos o bloqueio local
+      // Atualiza Firestore apenas com bloqueio temporário
       const presentRef = doc(db, "presents", p.id);
       await updateDoc(presentRef, {
         "payment.blockedAt": serverTimestamp(),
+        "payment.status": "pending",
       });
     } catch (err) {
       console.error("Erro ao criar pagamento:", err);
@@ -92,7 +94,7 @@ export default function Presentes() {
         🎁 Lista de Presentes
       </h2>
 
-      {/* ✅ Mensagem de sucesso */}
+      {/* ✅ Mensagem de sucesso animada */}
       {showSuccess && (
         <div
           style={{
@@ -105,6 +107,9 @@ export default function Presentes() {
             maxWidth: "500px",
             fontWeight: "bold",
             fontSize: "16px",
+            opacity: fadeOut ? 0 : 1,
+            transform: fadeOut ? "translateY(-10px)" : "translateY(0)",
+            transition: "opacity 1s ease, transform 1s ease",
           }}
         >
           ✅ Pagamento confirmado com sucesso!
@@ -129,6 +134,7 @@ export default function Presentes() {
               borderRadius: "10px",
               boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
               textAlign: "center",
+              transition: "transform 0.2s ease",
             }}
           >
             {p.imagemUrl && (
