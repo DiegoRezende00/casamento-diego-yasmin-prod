@@ -75,8 +75,8 @@ export default function Presentes() {
         console.warn("⚠️ Não foi possível atualizar present.lastMp", e);
       }
 
-      // 🔹 Escuta apenas a transação recém-criada
-      const transRef = doc(db, "payments", data.id);
+      // 🔹 Escuta apenas a transação recém-criada na subcoleção transactions
+      const transRef = doc(db, "presents", p.id, "transactions", paymentId);
       const unsubTrans = onDocSnapshot(transRef, (snap) => {
         if (!snap.exists()) return;
         const tx = snap.data();
@@ -99,7 +99,7 @@ export default function Presentes() {
           setCopyCode("");
           alert("Pagamento cancelado ou expirado. Tente novamente.");
           try { unsubTrans(); } catch(e){}
-          transUnsubRef.current = null;
+          transUnsubRefRef.current = null;
         }
       });
 
