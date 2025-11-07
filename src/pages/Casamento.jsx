@@ -3,7 +3,7 @@ import "./Casamento.css";
 
 const Casamento = () => {
   const googleMapsLink =
-    "https://www.google.com/maps/place/Espa%C3%A7o+Caplua+-+Piracicaba,+SP";
+    "https://www.google.com/maps/place/Taquaral+Caf%C3%A9/@-22.786206,-47.5894864,17z/data=!3m1!4b1!4m6!3m5!1s0x94c6256ed0a3e573:0xaab5a960bb7a8a29!8m2!3d-22.786211!4d-47.5846155!16s%2Fg%2F11kq6sqgt9?entry=ttu&g_ep=EgoyMDI1MTEwNC4xIKXMDSoASAFQAw%3D%3D";
   const googleCalendarLink =
     "https://calendar.google.com/calendar/render?action=TEMPLATE&text=Casamento+Nadine+e+Gabriel&dates=20251220T193000Z/20251220T223000Z&details=Casamento+de+Nadine+e+Gabriel&location=Espa%C3%A7o+Caplua,+Piracicaba,+SP,+Brasil";
 
