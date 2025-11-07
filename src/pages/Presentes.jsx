@@ -16,10 +16,7 @@ export default function Presentes() {
   const [qrCode, setQrCode] = useState(null);
   const [selectedGift, setSelectedGift] = useState(null);
   const [copyCode, setCopyCode] = useState("");
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [fadeOut, setFadeOut] = useState(false);
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
-
   const transUnsubRef = useRef(null);
 
   useEffect(() => {
@@ -56,9 +53,9 @@ export default function Presentes() {
         { headers: { "Content-Type": "application/json" } }
       );
 
-      const mp_id = data.mp_id || data.id || null;
+      const mp_id = data.paymentId || data.id || null;
       if (!mp_id) {
-        alert("Erro: mp_id ausente na resposta do servidor.");
+        alert("Erro: paymentId ausente na resposta do servidor.");
         return;
       }
 
@@ -72,43 +69,35 @@ export default function Presentes() {
           "payment.lastCreatedAt": serverTimestamp(),
         });
       } catch (e) {
-        console.warn("⚠️ Não foi possível atualizar present.lastMp (não crítico)", e);
+        console.warn("⚠️ Não foi possível atualizar present.lastMp", e);
       }
 
-      const transRef = doc(db, "presents", p.id, "transactions", mp_id);
-      const unsubTrans = onDocSnapshot(transRef, (snap) => {
+      // 🔹 Agora escutamos o próprio presente e não transactions
+      const presentRef = doc(db, "presents", p.id);
+      const unsubPresent = onDocSnapshot(presentRef, (snap) => {
         if (!snap.exists()) return;
-        const tx = snap.data();
+        const presData = snap.data();
 
-        // ✅ Pagamento confirmado
-        if (tx.status === "paid" || tx.status === "approved") {
-          setPaymentConfirmed(true); // ativa o estado de confirmação
-          setQrCode(null); // remove QR code
+        const status = presData?.payment?.status;
+        if (status === "paid" || status === "approved") {
+          setPaymentConfirmed(true);
+          setQrCode(null);
           setCopyCode("");
 
-          // aguarda 3s e fecha o modal automaticamente
+          // Fecha o modal depois de 5s
           setTimeout(() => {
             setPaymentConfirmed(false);
             setSelectedGift(null);
-          }, 8000);
+          }, 5000);
 
           try {
-            unsubTrans();
-          } catch (e) {}
-          transUnsubRef.current = null;
-        } else if (["cancelled", "rejected", "expired"].includes(tx.status)) {
-          setQrCode(null);
-          setSelectedGift(null);
-          setCopyCode("");
-          alert("Pagamento cancelado ou expirado. Tente novamente.");
-          try {
-            unsubTrans();
+            unsubPresent();
           } catch (e) {}
           transUnsubRef.current = null;
         }
       });
 
-      transUnsubRef.current = unsubTrans;
+      transUnsubRef.current = unsubPresent;
     } catch (err) {
       console.error("❌ Erro ao criar pagamento:", err.response || err);
       alert("Erro ao iniciar o pagamento. Verifique o console.");
@@ -148,7 +137,6 @@ export default function Presentes() {
               borderRadius: "10px",
               boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
               textAlign: "center",
-              transition: "transform 0.2s ease",
             }}
           >
             {p.imagemUrl && (
@@ -172,11 +160,7 @@ export default function Presentes() {
                     maxWidth: "100%",
                     maxHeight: "100%",
                     objectFit: "contain",
-                    borderRadius: "6px",
-                    transition: "transform 0.3s ease",
                   }}
-                  onMouseOver={(e) => (e.currentTarget.style.transform = "scale(1.05)")}
-                  onMouseOut={(e) => (e.currentTarget.style.transform = "scale(1.0)")}
                 />
               </div>
             )}
@@ -205,7 +189,7 @@ export default function Presentes() {
         ))}
       </div>
 
-      {/* 🔹 Modal Pix */}
+      {/* 🔹 Modal Pix / Pagamento */}
       {(qrCode || paymentConfirmed) && selectedGift && (
         <div
           style={{
@@ -231,9 +215,9 @@ export default function Presentes() {
               maxWidth: "400px",
               width: "90%",
               transition: "all 0.3s ease",
+              animation: "fadeIn 0.5s ease",
             }}
           >
-            {/* Se o pagamento foi confirmado, mostra mensagem */}
             {paymentConfirmed ? (
               <div
                 style={{
@@ -245,14 +229,18 @@ export default function Presentes() {
                   alignItems: "center",
                   justifyContent: "center",
                   minHeight: "250px",
-                  animation: "fadeIn 0.8s ease",
                 }}
               >
-                ✅ Pagamento confirmado com sucesso!
+                ✅ Pagamento confirmado com sucesso!  
+                <p style={{ fontSize: "1rem", marginTop: "1rem", color: "#4caf50" }}>
+                  Obrigado por presentear! ❤️
+                </p>
               </div>
             ) : (
               <>
-                <h3 style={{ color: "#2e7d32" }}>Pagamento de {selectedGift.nome}</h3>
+                <h3 style={{ color: "#2e7d32" }}>
+                  Pagamento de {selectedGift.nome}
+                </h3>
 
                 <img
                   src={qrCode}
@@ -266,7 +254,7 @@ export default function Presentes() {
                 />
 
                 <p style={{ marginTop: "1rem" }}>
-                  Escaneie com o app do Mercado Pago ou copie o código abaixo 👇
+                  Escaneie com o app do banco ou copie o código abaixo 👇
                 </p>
 
                 {copyCode && (
