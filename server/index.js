@@ -55,12 +55,11 @@ const mp = new MercadoPagoConfig({
 // 🌐 Configuração CORS
 // ======================
 const allowedOrigins = [
-  process.env.FRONTEND_ORIGIN, // domínio principal da Vercel
-  "https://casamento-diego-yasmin-prod.vercel.app", // domínio principal
-  "http://localhost:5173", // para desenvolvimento local
+  process.env.FRONTEND_ORIGIN,
+  "https://casamento-diego-yasmin-prod.vercel.app",
+  "http://localhost:5173",
 ];
 
-// Permitir também subdomínios temporários da Vercel (preview deploys)
 const vercelPattern =
   /^https:\/\/casamento-diego-yasmin-prod-[a-z0-9]+\.vercel\.app$/;
 
@@ -87,12 +86,11 @@ app.use(
 // 🧠 Rotas
 // ======================
 
-// Healthcheck simples
 app.get("/", (req, res) => {
   res.send("Servidor do Casamento está rodando 🚀");
 });
 
-// Criação de pagamento
+// Criação de pagamento PIX
 app.post("/create_payment", async (req, res) => {
   try {
     const { presentId, amount, title } = req.body;
@@ -122,6 +120,7 @@ app.post("/create_payment", async (req, res) => {
 
     await db.collection("presents").doc(presentId).update({
       payment: paymentInfo,
+      reservado: true,
     });
 
     res.json(paymentInfo);
@@ -135,12 +134,56 @@ app.post("/create_payment", async (req, res) => {
 });
 
 // ======================
+// 📡 Webhook Mercado Pago
+// ======================
+app.post("/webhook", async (req, res) => {
+  try {
+    const { type, data } = req.body;
+    console.log("📬 Webhook recebido:", req.body);
+
+    if (type === "payment" && data?.id) {
+      const payment = await new Payment(mp).get({ id: data.id });
+
+      const paymentStatus = payment.status;
+      const paymentId = payment.id;
+
+      console.log(`🔔 Pagamento ${paymentId} atualizado: ${paymentStatus}`);
+
+      // Procura o presente que contém esse pagamento
+      const presentsRef = db.collection("presents");
+      const snapshot = await presentsRef
+        .where("payment.paymentId", "==", paymentId)
+        .get();
+
+      if (!snapshot.empty) {
+        const presentDoc = snapshot.docs[0];
+        const presentRef = presentDoc.ref;
+
+        await presentRef.update({
+          "payment.status": paymentStatus,
+          atualizadoEm: new Date().toISOString(),
+          ...(paymentStatus === "approved" || paymentStatus === "success"
+            ? { reservado: true }
+            : {}),
+        });
+
+        console.log(`✅ Status atualizado no Firestore para: ${paymentStatus}`);
+      } else {
+        console.warn("⚠️ Nenhum presente encontrado para esse pagamento.");
+      }
+    }
+
+    res.status(200).send("OK");
+  } catch (err) {
+    console.error("❌ Erro no webhook:", err);
+    res.status(500).send("Erro no processamento do webhook");
+  }
+});
+
+// ======================
 // 🚀 Inicialização
 // ======================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ Servidor rodando na porta ${PORT}`);
-  console.log(`🌍 Domínios permitidos (CORS):`);
-  allowedOrigins.forEach((o) => console.log("   -", o));
-  console.log("   - (subdomínios temporários da Vercel habilitados)");
 });
