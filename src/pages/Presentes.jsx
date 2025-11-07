@@ -1,4 +1,4 @@
-// Presentes.jsx (frontend) - pronto para colar
+// Presentes.jsx (frontend)
 import React, { useEffect, useState, useRef } from "react";
 import { db } from "../firebase";
 import {
@@ -20,10 +20,8 @@ export default function Presentes() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [fadeOut, setFadeOut] = useState(false);
 
-  // guarda unsubscribe do listener da transação ativa
   const transUnsubRef = useRef(null);
 
-  // Escuta catálogo de presentes
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "presents"), (snapshot) => {
       const lista = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -32,7 +30,6 @@ export default function Presentes() {
     return () => unsub();
   }, []);
 
-  // função para iniciar reserva / pagamento
   const reservar = async (p) => {
     const confirm = window.confirm(
       `Deseja presentear "${p.nome}" por R$ ${Number(p.preco).toFixed(2)}?`
@@ -40,9 +37,10 @@ export default function Presentes() {
     if (!confirm) return;
 
     try {
-      // cancela listener anterior se houver
       if (transUnsubRef.current) {
-        try { transUnsubRef.current(); } catch (e) {}
+        try {
+          transUnsubRef.current();
+        } catch (e) {}
         transUnsubRef.current = null;
       }
 
@@ -51,19 +49,11 @@ export default function Presentes() {
       setCopyCode("");
       setSelectedGift(p);
 
-      console.log("📦 Enviando pagamento:", {
-        title: p.nome,
-        amount: p.preco,
-        presentId: p.id,
-      });
-
       const { data } = await axios.post(
         `${import.meta.env.VITE_API_URL}/create_payment`,
         { title: p.nome, amount: p.preco, presentId: p.id },
         { headers: { "Content-Type": "application/json" } }
       );
-
-      console.log("✅ Resposta do backend:", data);
 
       const mp_id = data.mp_id || data.id || null;
       if (!mp_id) {
@@ -74,7 +64,6 @@ export default function Presentes() {
       if (data.qr_base64) setQrCode(`data:image/png;base64,${data.qr_base64}`);
       if (data.qr_code) setCopyCode(data.qr_code);
 
-      // Opcional: marca present com último pagamento (não impede múltiplas)
       try {
         const presentRef = doc(db, "presents", p.id);
         await updateDoc(presentRef, {
@@ -85,36 +74,33 @@ export default function Presentes() {
         console.warn("⚠️ Não foi possível atualizar present.lastMp (não crítico)", e);
       }
 
-      // Escuta apenas a transação criada: presents/{presentId}/transactions/{mp_id}
       const transRef = doc(db, "presents", p.id, "transactions", mp_id);
       const unsubTrans = onDocSnapshot(transRef, (snap) => {
         if (!snap.exists()) return;
         const tx = snap.data();
-        console.log("🔔 Atualização da transação:", tx);
         if (tx.status === "paid" || tx.status === "approved") {
-          // sucesso: fecha modal e mostra mensagem
           setQrCode(null);
           setSelectedGift(null);
           setCopyCode("");
           setShowSuccess(true);
-
           setTimeout(() => setFadeOut(true), 2000);
           setTimeout(() => {
             setShowSuccess(false);
             setFadeOut(false);
             window.location.reload();
           }, 3000);
-
-          // cancela listener
-          try { unsubTrans(); } catch (e) {}
+          try {
+            unsubTrans();
+          } catch (e) {}
           transUnsubRef.current = null;
         } else if (["cancelled", "rejected", "expired"].includes(tx.status)) {
-          // fechar modal e mostrar erro simples
           setQrCode(null);
           setSelectedGift(null);
           setCopyCode("");
           alert("Pagamento cancelado ou expirado. Tente novamente.");
-          try { unsubTrans(); } catch (e) {}
+          try {
+            unsubTrans();
+          } catch (e) {}
           transUnsubRef.current = null;
         }
       });
@@ -180,24 +166,43 @@ export default function Presentes() {
               borderRadius: "10px",
               boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
               textAlign: "center",
+              transition: "transform 0.2s ease",
             }}
           >
             {p.imagemUrl && (
-              <img
-                src={p.imagemUrl}
-                alt={p.nome}
+              <div
                 style={{
                   width: "100%",
-                  height: "180px",
-                  objectFit: "cover",
+                  height: "220px",
+                  backgroundColor: "#fafafa",
                   borderRadius: "8px",
+                  overflow: "hidden",
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
                   marginBottom: "10px",
                 }}
-              />
+              >
+                <img
+                  src={p.imagemUrl}
+                  alt={p.nome}
+                  style={{
+                    maxWidth: "100%",
+                    maxHeight: "100%",
+                    objectFit: "contain", // 🔹 não corta, mantém proporção
+                    borderRadius: "6px",
+                    transition: "transform 0.3s ease",
+                  }}
+                  onMouseOver={(e) => (e.currentTarget.style.transform = "scale(1.05)")}
+                  onMouseOut={(e) => (e.currentTarget.style.transform = "scale(1.0)")}
+                />
+              </div>
             )}
 
             <h3 style={{ color: "#2e7d32", marginBottom: "0.5rem" }}>{p.nome}</h3>
-            <p><strong>Valor:</strong> R$ {Number(p.preco).toFixed(2)}</p>
+            <p>
+              <strong>Valor:</strong> R$ {Number(p.preco).toFixed(2)}
+            </p>
 
             <button
               onClick={() => reservar(p)}
