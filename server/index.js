@@ -22,16 +22,13 @@ let serviceAccount;
 
 try {
   if (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
-    // ✅ Decodifica variável Base64
     const decoded = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64, "base64").toString("utf-8");
     serviceAccount = JSON.parse(decoded);
     console.log("✅ Credenciais Firebase carregadas de FIREBASE_SERVICE_ACCOUNT_BASE64");
   } else if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-    // Suporte opcional ao JSON puro em string (sem Base64)
     serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
     console.log("✅ Credenciais Firebase carregadas de FIREBASE_SERVICE_ACCOUNT (JSON)");
   } else {
-    // Modo local (arquivo físico)
     const serviceAccountPath = path.join(__dirname, "service-account.json");
     if (fs.existsSync(serviceAccountPath)) {
       serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, "utf8"));
@@ -59,24 +56,22 @@ const mp = new MercadoPagoConfig({
 });
 
 // ======================
-// 🌐 Configuração CORS
+// 🌐 CORS
 // ======================
 const allowedOrigins = [
   process.env.FRONTEND_ORIGIN,
   "https://casamento-diego-yasmin-prod.vercel.app",
   "http://localhost:5173",
 ];
-
 const vercelPattern = /^https:\/\/casamento-diego-yasmin-prod-[a-z0-9]+\.vercel\.app$/;
 
 app.use(
   cors({
-    origin: function (origin, callback) {
-      if (!origin || allowedOrigins.includes(origin) || vercelPattern.test(origin)) {
-        callback(null, true);
-      } else {
+    origin: (origin, cb) => {
+      if (!origin || allowedOrigins.includes(origin) || vercelPattern.test(origin)) cb(null, true);
+      else {
         console.log("❌ Bloqueado por CORS:", origin);
-        callback(new Error("Not allowed by CORS"));
+        cb(new Error("Not allowed by CORS"));
       }
     },
     methods: ["GET", "POST"],
@@ -87,18 +82,12 @@ app.use(
 // ======================
 // 🧠 Rotas
 // ======================
-app.get("/", (req, res) => {
-  res.send("Servidor do Casamento está rodando 🚀");
-});
+app.get("/", (req, res) => res.send("Servidor do Casamento está rodando 🚀"));
 
-// Criação de pagamento
 app.post("/create_payment", async (req, res) => {
   try {
     const { presentId, amount, title } = req.body;
-
-    if (!presentId || !amount || !title) {
-      return res.status(400).json({ error: "Dados incompletos" });
-    }
+    if (!presentId || !amount || !title) return res.status(400).json({ error: "Dados incompletos" });
 
     const payment = await new Payment(mp).create({
       body: {
@@ -110,7 +99,6 @@ app.post("/create_payment", async (req, res) => {
     });
 
     const txData = payment.point_of_interaction?.transaction_data || {};
-
     const paymentDoc = {
       presentId,
       title,
@@ -131,7 +119,9 @@ app.post("/create_payment", async (req, res) => {
   }
 });
 
-// Webhook Mercado Pago
+// ======================
+// 📡 Webhook Mercado Pago
+// ======================
 app.post("/webhook", async (req, res) => {
   try {
     const paymentData = req.body?.data?.id;
@@ -144,11 +134,27 @@ app.post("/webhook", async (req, res) => {
     const snapshot = await db.collection("payments").where("paymentId", "==", paymentId).get();
 
     if (!snapshot.empty) {
+      const docData = snapshot.docs[0].data();
       const docRef = snapshot.docs[0].ref;
+      const presentId = docData.presentId;
+
+      // Atualiza a coleção "payments"
       await docRef.update({
         status,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
+
+      // Atualiza o presente, se confirmado
+      if (status === "approved" || status === "paid") {
+        const presentRef = db.collection("presents").doc(presentId);
+        await presentRef.update({
+          reservado: true,
+          "payment.status": status,
+          "payment.lastConfirmedAt": admin.firestore.FieldValue.serverTimestamp(),
+        });
+        console.log(`🎁 Presente ${presentId} marcado como reservado (pagamento ${status})`);
+      }
+
       console.log(`✅ Pagamento ${paymentId} atualizado para ${status}`);
     } else {
       console.log(`⚠️ Nenhum documento encontrado para paymentId: ${paymentId}`);
