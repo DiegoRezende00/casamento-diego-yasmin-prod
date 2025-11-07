@@ -59,7 +59,7 @@ export default function Presentes() {
       // Cria um novo registro de pagamento no Firestore
       const newPayment = await addDoc(collection(db, "payments"), {
         presentId: gift.id,
-        presentName: gift.name,
+        presentName: gift.nome,
         status: "pending",
         createdAt: new Date(),
       });
@@ -67,8 +67,8 @@ export default function Presentes() {
       const response = await axios.post(
         `${import.meta.env.VITE_SERVER_URL}/create_preference`,
         {
-          title: gift.name,
-          price: gift.price,
+          title: gift.nome,
+          price: gift.preco,
           paymentId: newPayment.id,
         }
       );
@@ -105,8 +105,8 @@ export default function Presentes() {
             }}
           >
             <img
-              src={gift.image}
-              alt={gift.name}
+              src={gift.imagemUrl}
+              alt={gift.nome}
               style={{
                 width: "100%",
                 height: "160px",
@@ -114,10 +114,10 @@ export default function Presentes() {
                 borderRadius: "8px",
               }}
             />
-            <h3 style={{ marginTop: "10px" }}>{gift.name}</h3>
+            <h3 style={{ marginTop: "10px" }}>{gift.nome}</h3>
             <p style={{ color: "#666" }}>{gift.description}</p>
             <p style={{ fontWeight: "bold", marginTop: "10px" }}>
-              R$ {gift.price}
+              R$ {gift.preco}
             </p>
             <button
               onClick={() => handleBuy(gift)}
