@@ -12,33 +12,30 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 
-// 🌐 CORS — permite apenas o domínio de produção e localhost
+// 🌐 CORS — permite apenas domínios autorizados
 const allowedOrigins = [
   "https://casamento-diego-yasmin.vercel.app",
-  "http://localhost:5173",
   "https://casamento-diego-yasmin-prod.vercel.app",
+  "http://localhost:5173",
 ];
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Permite requests sem origin (como em ferramentas internas ou backend)
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
+      if (!origin || allowedOrigins.includes(origin)) callback(null, true);
+      else {
         console.warn(`🚫 Bloqueado por CORS: ${origin}`);
-        callback(null, false);
+        callback(new Error("CORS não permitido"));
       }
     },
-    credentials: true,
   })
 );
 
-// 🧩 Caminhos utilitários
+// 🧩 Caminhos
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// 🔥 Firebase config (Render + local)
+// 🔥 Firebase
 let serviceAccount;
 try {
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
@@ -70,7 +67,7 @@ const payment = new Payment(client);
 
 // 🏠 Health check
 app.get("/", (req, res) => {
-  res.send("💍 Servidor do Casamento Diego & Yasmin está rodando com sucesso!");
+  res.send("💍 API do Casamento Diego & Yasmin funcionando!");
 });
 
 // 💸 Criar pagamento PIX
@@ -82,6 +79,8 @@ app.post("/create_payment", async (req, res) => {
       return res.status(400).json({ error: "Campos obrigatórios ausentes." });
     }
 
+    console.log("📦 Criando pagamento para presente:", { title, amount, presentId });
+
     const body = {
       transaction_amount: Number(amount),
       description: title,
@@ -92,7 +91,9 @@ app.post("/create_payment", async (req, res) => {
 
     const result = await payment.create({ body });
 
-    // Atualiza Firestore: status "pending"
+    const qrData = result.point_of_interaction?.transaction_data;
+    if (!qrData) throw new Error("Dados de QRCode ausentes na resposta do Mercado Pago");
+
     const presentRef = db.collection("presents").doc(presentId);
     await presentRef.update({
       "payment.status": "pending",
@@ -102,8 +103,8 @@ app.post("/create_payment", async (req, res) => {
 
     res.status(200).json({
       id: result.id,
-      qr_code: result.point_of_interaction.transaction_data.qr_code,
-      qr_base64: result.point_of_interaction.transaction_data.qr_code_base64,
+      qr_code: qrData.qr_code,
+      qr_base64: qrData.qr_code_base64,
     });
   } catch (error) {
     console.error("❌ Erro ao criar pagamento:", error);
@@ -114,25 +115,23 @@ app.post("/create_payment", async (req, res) => {
 // 🔔 Webhook Mercado Pago
 app.post("/webhook", async (req, res) => {
   try {
-    console.log("📬 Webhook recebido:", req.body);
+    console.log("📬 Webhook recebido:", JSON.stringify(req.body));
 
     const paymentId = req.body?.data?.id;
     if (!paymentId) return res.sendStatus(400);
 
-    // Consulta detalhada no Mercado Pago
     const response = await payment.get({ id: paymentId });
     const { status, metadata } = response;
 
-    console.log(`🔎 Pagamento ${paymentId} status: ${status}`);
-
-    // Busca o presentId
     let presentId = metadata?.presentId;
+
     if (!presentId) {
       const snapshot = await db
         .collection("presents")
         .where("payment.mp_id", "==", paymentId)
         .limit(1)
         .get();
+
       if (!snapshot.empty) {
         presentId = snapshot.docs[0].id;
       }
@@ -145,8 +144,7 @@ app.post("/webhook", async (req, res) => {
 
     const presentRef = db.collection("presents").doc(presentId);
 
-    // Atualiza Firestore conforme status do pagamento
-    const updateData = {
+    await presentRef.update({
       "payment.status":
         status === "approved"
           ? "paid"
@@ -154,15 +152,9 @@ app.post("/webhook", async (req, res) => {
           ? "cancelled"
           : status,
       "payment.updatedAt": admin.firestore.FieldValue.serverTimestamp(),
-    };
+    });
 
-    await presentRef.update(updateData);
-
-    if (status === "approved") {
-      console.log(`🎉 Presente ${presentId} marcado como pago ✅`);
-    } else {
-      console.log(`ℹ️ Pagamento ${paymentId} atualizado para ${status}`);
-    }
+    console.log(`🪙 Pagamento ${paymentId} (${status}) vinculado ao presente ${presentId}`);
 
     res.sendStatus(200);
   } catch (error) {
@@ -171,8 +163,8 @@ app.post("/webhook", async (req, res) => {
   }
 });
 
-// 🚀 Inicia servidor
+// 🚀 Start
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-  console.log(`🚀 Servidor rodando na porta ${PORT} (modo produção)`);
+  console.log(`🚀 Servidor rodando na porta ${PORT}`);
 });
