@@ -128,24 +128,28 @@ export default function Presentes() {
         🎁 Lista de Presentes
       </h2>
 
+      {/* 🔔 Banner de confirmação em tela cheia */}
       {showSuccess && (
         <div
           style={{
-            backgroundColor: "#d4edda",
-            color: "#155724",
-            padding: "1rem",
-            borderRadius: "8px",
-            margin: "20px auto",
-            textAlign: "center",
-            maxWidth: "500px",
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            backgroundColor: "rgba(255,255,255,0.95)",
+            color: "#2e7d32",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            fontSize: "2rem",
             fontWeight: "bold",
-            fontSize: "16px",
+            zIndex: 2000,
             opacity: fadeOut ? 0 : 1,
-            transform: fadeOut ? "translateY(-10px)" : "translateY(0)",
-            transition: "opacity 1s ease, transform 1s ease",
+            transition: "opacity 1.5s ease",
           }}
         >
-          ✅ Pagamento confirmado com sucesso!
+          ✅ PAGAMENTO CONFIRMADO COM SUCESSO!
         </div>
       )}
 
@@ -189,7 +193,7 @@ export default function Presentes() {
                   style={{
                     maxWidth: "100%",
                     maxHeight: "100%",
-                    objectFit: "contain", // 🔹 não corta, mantém proporção
+                    objectFit: "contain",
                     borderRadius: "6px",
                     transition: "transform 0.3s ease",
                   }}
@@ -204,25 +208,41 @@ export default function Presentes() {
               <strong>Valor:</strong> R$ {Number(p.preco).toFixed(2)}
             </p>
 
-            <button
-              onClick={() => reservar(p)}
-              disabled={loadingId === p.id}
-              style={{
-                backgroundColor: "#2e7d32",
-                color: "#fff",
-                padding: "10px 15px",
-                borderRadius: 8,
-                marginTop: "10px",
-                cursor: "pointer",
-                opacity: loadingId === p.id ? 0.7 : 1,
-              }}
-            >
-              {loadingId === p.id ? "Gerando..." : "Presentear 🎁"}
-            </button>
+            {p.reservado || p?.payment?.status === "approved" || p?.payment?.status === "paid" ? (
+              <div
+                style={{
+                  backgroundColor: "#d4edda",
+                  color: "#155724",
+                  padding: "10px 15px",
+                  borderRadius: 8,
+                  marginTop: "10px",
+                  fontWeight: "bold",
+                }}
+              >
+                ✅ Presente já confirmado!
+              </div>
+            ) : (
+              <button
+                onClick={() => reservar(p)}
+                disabled={loadingId === p.id}
+                style={{
+                  backgroundColor: "#2e7d32",
+                  color: "#fff",
+                  padding: "10px 15px",
+                  borderRadius: 8,
+                  marginTop: "10px",
+                  cursor: "pointer",
+                  opacity: loadingId === p.id ? 0.7 : 1,
+                }}
+              >
+                {loadingId === p.id ? "Gerando..." : "Presentear 🎁"}
+              </button>
+            )}
           </div>
         ))}
       </div>
 
+      {/* 🔹 Modal Pix */}
       {qrCode && selectedGift && (
         <div
           style={{
