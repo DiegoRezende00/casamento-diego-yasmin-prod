@@ -81,12 +81,10 @@ app.use(
 // ======================
 app.get("/", (req, res) => res.send("Servidor do Casamento está rodando 🚀"));
 
-// 🔹 Cria pagamento
 app.post("/create_payment", async (req, res) => {
   try {
     const { presentId, amount, title } = req.body;
-    if (!presentId || !amount || !title)
-      return res.status(400).json({ error: "Dados incompletos" });
+    if (!presentId || !amount || !title) return res.status(400).json({ error: "Dados incompletos" });
 
     const payment = await new Payment(mp).create({
       body: {
@@ -99,11 +97,17 @@ app.post("/create_payment", async (req, res) => {
 
     const txData = payment.point_of_interaction?.transaction_data || {};
 
+    // 🔹 Salva na subcoleção transactions do presente
+    const transRef = db
+      .collection("presents")
+      .doc(presentId)
+      .collection("transactions")
+      .doc(payment.id);
+
     const paymentDoc = {
-      presentId,
+      paymentId: payment.id,
       title,
       amount,
-      paymentId: payment.id,
       qr_code: txData.qr_code || null,
       qr_base64: txData.qr_code_base64 || null,
       expiresAt: payment.date_of_expiration || null,
@@ -111,17 +115,18 @@ app.post("/create_payment", async (req, res) => {
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     };
 
-    // 🔹 Cria documento da transação, sem alterar o presente
-    const newDoc = await db.collection("payments").add(paymentDoc);
+    await transRef.set(paymentDoc);
 
-    res.json({ ...paymentDoc, id: newDoc.id });
+    res.json({ ...paymentDoc, id: transRef.id });
   } catch (err) {
     console.error("❌ Erro ao criar pagamento:", err);
     res.status(500).json({ error: "Erro ao criar pagamento", detail: err.message });
   }
 });
 
-// 🔹 Webhook Mercado Pago
+// ======================
+// 📡 Webhook Mercado Pago
+// ======================
 app.post("/webhook", async (req, res) => {
   try {
     const paymentData = req.body?.data?.id;
@@ -131,20 +136,33 @@ app.post("/webhook", async (req, res) => {
     const status = paymentInfo.status;
     const paymentId = paymentInfo.id;
 
-    const snapshot = await db.collection("payments").where("paymentId", "==", paymentId).get();
+    // 🔹 Busca transação em todos os presentes
+    const presentsSnapshot = await db.collection("presents").get();
 
-    if (!snapshot.empty) {
-      const docRef = snapshot.docs[0].ref;
+    let transFound = false;
 
-      // Atualiza apenas a transação
-      await docRef.update({
-        status,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+    for (const presentDoc of presentsSnapshot.docs) {
+      const presentId = presentDoc.id;
+      const transRef = db
+        .collection("presents")
+        .doc(presentId)
+        .collection("transactions")
+        .doc(paymentId);
 
-      console.log(`✅ Pagamento ${paymentId} atualizado para ${status}`);
-    } else {
-      console.log(`⚠️ Nenhum documento encontrado para paymentId: ${paymentId}`);
+      const transSnap = await transRef.get();
+      if (transSnap.exists) {
+        transFound = true;
+        await transRef.update({
+          status,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        console.log(`✅ Pagamento ${paymentId} atualizado para ${status}`);
+        break;
+      }
+    }
+
+    if (!transFound) {
+      console.log(`⚠️ Nenhuma transação encontrada para paymentId: ${paymentId}`);
     }
 
     res.sendStatus(200);
