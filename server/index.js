@@ -1,170 +1,111 @@
+// server/index.js
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { MercadoPagoConfig, Payment } from "mercadopago";
 import admin from "firebase-admin";
-import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import fs from "fs";
 
 dotenv.config();
 
 const app = express();
 app.use(express.json());
+app.use(cors({
+  origin: [
+    "https://casamento-diego-yasmin-prod.vercel.app",
+    "http://localhost:5173",
+  ],
+  methods: ["GET", "POST"],
+  credentials: true,
+}));
 
-// 🌐 CORS — permite apenas domínios autorizados
-const allowedOrigins = [
-  "https://casamento-diego-yasmin.vercel.app",
-  "https://casamento-diego-yasmin-prod.vercel.app",
-  "http://localhost:5173",
-];
-
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) callback(null, true);
-      else {
-        console.warn(`🚫 Bloqueado por CORS: ${origin}`);
-        callback(new Error("CORS não permitido"));
-      }
-    },
-  })
-);
-
-// 🧩 Caminhos
+// Caminho seguro da chave Firebase
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const firebasePath = path.join(__dirname, "firebase-key.json");
 
-// 🔥 Firebase
-let serviceAccount;
-try {
-  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-    const decoded = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT, "base64").toString("utf8");
-    serviceAccount = JSON.parse(decoded);
-    console.log("✅ Firebase service account carregado via variável de ambiente");
-  } else {
-    const serviceAccountPath = path.join(__dirname, "service-account.json");
-    serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, "utf8"));
-    console.log("✅ Firebase service account carregado via arquivo local");
-  }
-
-  if (!admin.apps.length) {
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-    });
-  }
-} catch (error) {
-  console.error("❌ Erro ao inicializar Firebase:", error);
+// 🔹 Inicializa o Firebase
+if (!admin.apps.length) {
+  const serviceAccount = JSON.parse(fs.readFileSync(firebasePath, "utf8"));
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
 }
-
 const db = admin.firestore();
 
-// 💰 Mercado Pago config
-const client = new MercadoPagoConfig({
-  accessToken: process.env.MP_ACCESS_TOKEN,
-});
-const payment = new Payment(client);
+// 🔹 Mercado Pago
+const mpClient = new MercadoPagoConfig({ accessToken: process.env.MP_ACCESS_TOKEN });
+const payment = new Payment(mpClient);
 
-// 🏠 Health check
-app.get("/", (req, res) => {
-  res.send("💍 API do Casamento Diego & Yasmin funcionando!");
-});
-
-// 💸 Criar pagamento PIX
+// ==========================
+// 🔹 Endpoint: criar pagamento
+// ==========================
 app.post("/create_payment", async (req, res) => {
   try {
     const { title, amount, presentId } = req.body;
-
-    if (!title || !amount || !presentId) {
-      return res.status(400).json({ error: "Campos obrigatórios ausentes." });
-    }
-
-    console.log("📦 Criando pagamento para presente:", { title, amount, presentId });
 
     const body = {
       transaction_amount: Number(amount),
       description: title,
       payment_method_id: "pix",
-      payer: { email: "convidado@casamento.com" },
-      metadata: { presentId },
+      payer: { email: "pagador@example.com" },
+      notification_url: `${process.env.API_URL}/webhook`,
     };
 
     const result = await payment.create({ body });
 
-    const qrData = result.point_of_interaction?.transaction_data;
-    if (!qrData) throw new Error("Dados de QRCode ausentes na resposta do Mercado Pago");
-
-    const presentRef = db.collection("presents").doc(presentId);
-    await presentRef.update({
+    // 🔹 Atualiza o Firestore com o paymentId e status "pending"
+    await db.collection("presents").doc(presentId).update({
+      "payment.paymentId": result.id,
       "payment.status": "pending",
-      "payment.createdAt": admin.firestore.FieldValue.serverTimestamp(),
-      "payment.mp_id": result.id,
-    });
-
-    res.status(200).json({
-      id: result.id,
-      qr_code: qrData.qr_code,
-      qr_base64: qrData.qr_code_base64,
-    });
-  } catch (error) {
-    console.error("❌ Erro ao criar pagamento:", error);
-    res.status(500).json({ error: "Erro ao criar pagamento" });
-  }
-});
-
-// 🔔 Webhook Mercado Pago
-app.post("/webhook", async (req, res) => {
-  try {
-    console.log("📬 Webhook recebido:", JSON.stringify(req.body));
-
-    const paymentId = req.body?.data?.id;
-    if (!paymentId) return res.sendStatus(400);
-
-    const response = await payment.get({ id: paymentId });
-    const { status, metadata } = response;
-
-    let presentId = metadata?.presentId;
-
-    if (!presentId) {
-      const snapshot = await db
-        .collection("presents")
-        .where("payment.mp_id", "==", paymentId)
-        .limit(1)
-        .get();
-
-      if (!snapshot.empty) {
-        presentId = snapshot.docs[0].id;
-      }
-    }
-
-    if (!presentId) {
-      console.warn(`⚠️ Nenhum presente vinculado ao pagamento ${paymentId}`);
-      return res.sendStatus(200);
-    }
-
-    const presentRef = db.collection("presents").doc(presentId);
-
-    await presentRef.update({
-      "payment.status":
-        status === "approved"
-          ? "paid"
-          : ["cancelled", "rejected", "expired"].includes(status)
-          ? "cancelled"
-          : status,
       "payment.updatedAt": admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    console.log(`🪙 Pagamento ${paymentId} (${status}) vinculado ao presente ${presentId}`);
+    res.json({
+      id: result.id,
+      qr_base64: result.point_of_interaction.transaction_data.qr_code_base64,
+      qr_code: result.point_of_interaction.transaction_data.qr_code,
+    });
+  } catch (err) {
+    console.error("Erro ao criar pagamento:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==========================
+// 🔹 Endpoint: webhook Mercado Pago
+// ==========================
+app.post("/webhook", async (req, res) => {
+  try {
+    const paymentId = req.body.data?.id;
+    if (!paymentId) return res.status(400).json({ error: "Sem ID do pagamento" });
+
+    const result = await payment.get({ id: paymentId });
+
+    const status = result.status; // "approved", "pending", "rejected", etc.
+    const snapshot = await db
+      .collection("presents")
+      .where("payment.paymentId", "==", paymentId)
+      .get();
+
+    if (!snapshot.empty) {
+      const docRef = snapshot.docs[0].ref;
+      await docRef.update({
+        "payment.status": status,
+        "payment.updatedAt": admin.firestore.FieldValue.serverTimestamp(),
+      });
+      console.log(`✅ Pagamento ${paymentId} atualizado para ${status}`);
+    } else {
+      console.warn(`⚠️ Nenhum presente encontrado para paymentId ${paymentId}`);
+    }
 
     res.sendStatus(200);
-  } catch (error) {
-    console.error("❌ Erro no webhook:", error);
+  } catch (err) {
+    console.error("Erro no webhook:", err);
     res.sendStatus(500);
   }
 });
 
-// 🚀 Start
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor rodando na porta ${PORT}`);
-});
+app.listen(10000, () => console.log("Servidor rodando na porta 10000"));
