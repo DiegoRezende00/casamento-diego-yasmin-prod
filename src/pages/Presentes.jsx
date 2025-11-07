@@ -1,320 +1,248 @@
-// Presentes.jsx (frontend)
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { db } from "../firebase";
-import {
-  collection,
-  onSnapshot,
-  doc,
-  updateDoc,
-  serverTimestamp,
-  onSnapshot as onDocSnapshot,
-} from "firebase/firestore";
+import { collection, onSnapshot } from "firebase/firestore";
 import axios from "axios";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function Presentes() {
   const [presentes, setPresentes] = useState([]);
-  const [loadingId, setLoadingId] = useState(null);
-  const [qrCode, setQrCode] = useState(null);
   const [selectedGift, setSelectedGift] = useState(null);
-  const [copyCode, setCopyCode] = useState("");
+  const [paymentData, setPaymentData] = useState(null);
+  const [countdown, setCountdown] = useState(900); // 15 minutos
   const [showSuccess, setShowSuccess] = useState(false);
-  const [fadeOut, setFadeOut] = useState(false);
-
-  const transUnsubRef = useRef(null);
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "presents"), (snapshot) => {
-      const lista = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setPresentes(lista);
+      setPresentes(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
     });
     return () => unsub();
   }, []);
 
-  const reservar = async (p) => {
-    const confirm = window.confirm(
-      `Deseja presentear "${p.nome}" por R$ ${Number(p.preco).toFixed(2)}?`
-    );
-    if (!confirm) return;
+  // 🔹 Timer de contagem regressiva (15 minutos)
+  useEffect(() => {
+    if (!paymentData) return;
+    if (countdown <= 0) return;
 
-    try {
-      if (transUnsubRef.current) {
-        try {
-          transUnsubRef.current();
-        } catch (e) {}
-        transUnsubRef.current = null;
+    const timer = setInterval(() => {
+      setCountdown((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [paymentData, countdown]);
+
+  // 🔹 Listener para detectar pagamento confirmado (via Firestore)
+  useEffect(() => {
+    if (!paymentData?.id) return;
+    const unsub = onSnapshot(
+      collection(db, "payments"),
+      (snapshot) => {
+        const doc = snapshot.docs.find((d) => d.id === paymentData.id);
+        if (doc && doc.data().status === "approved") {
+          setShowSuccess(true);
+          setPaymentData(null);
+          setSelectedGift(null);
+        }
       }
+    );
+    return () => unsub();
+  }, [paymentData]);
 
-      setLoadingId(p.id);
-      setQrCode(null);
-      setCopyCode("");
-      setSelectedGift(p);
+  const reservar = async (gift) => {
+    setSelectedGift(gift);
+  };
 
+  const confirmarReserva = async () => {
+    if (!selectedGift) return;
+    try {
       const { data } = await axios.post(
         `${import.meta.env.VITE_API_URL}/create_payment`,
-        { title: p.nome, amount: p.preco, presentId: p.id },
-        { headers: { "Content-Type": "application/json" } }
-      );
-
-      const mp_id = data.mp_id || data.id || null;
-      if (!mp_id) {
-        alert("Erro: mp_id ausente na resposta do servidor.");
-        return;
-      }
-
-      if (data.qr_base64) setQrCode(`data:image/png;base64,${data.qr_base64}`);
-      if (data.qr_code) setCopyCode(data.qr_code);
-
-      try {
-        const presentRef = doc(db, "presents", p.id);
-        await updateDoc(presentRef, {
-          "payment.lastMp": mp_id,
-          "payment.lastCreatedAt": serverTimestamp(),
-        });
-      } catch (e) {
-        console.warn("⚠️ Não foi possível atualizar present.lastMp (não crítico)", e);
-      }
-
-      const transRef = doc(db, "presents", p.id, "transactions", mp_id);
-      const unsubTrans = onDocSnapshot(transRef, (snap) => {
-        if (!snap.exists()) return;
-        const tx = snap.data();
-        if (tx.status === "paid" || tx.status === "approved") {
-          setQrCode(null);
-          setSelectedGift(null);
-          setCopyCode("");
-          setShowSuccess(true);
-          setTimeout(() => setFadeOut(true), 2000);
-          setTimeout(() => {
-            setShowSuccess(false);
-            setFadeOut(false);
-            window.location.reload();
-          }, 3000);
-          try {
-            unsubTrans();
-          } catch (e) {}
-          transUnsubRef.current = null;
-        } else if (["cancelled", "rejected", "expired"].includes(tx.status)) {
-          setQrCode(null);
-          setSelectedGift(null);
-          setCopyCode("");
-          alert("Pagamento cancelado ou expirado. Tente novamente.");
-          try {
-            unsubTrans();
-          } catch (e) {}
-          transUnsubRef.current = null;
+        {
+          title: selectedGift.nome,
+          amount: selectedGift.preco,
+          presentId: selectedGift.id,
         }
-      });
-
-      transUnsubRef.current = unsubTrans;
+      );
+      setPaymentData(data);
+      setCountdown(900);
     } catch (err) {
-      console.error("❌ Erro ao criar pagamento:", err.response || err);
+      console.error("Erro ao criar pagamento:", err);
       alert("Erro ao iniciar o pagamento. Verifique o console.");
-    } finally {
-      setLoadingId(null);
     }
   };
 
   const copiarQRCode = () => {
-    if (!copyCode) return;
-    navigator.clipboard
-      .writeText(copyCode)
-      .then(() => alert("Código Pix copiado!"))
-      .catch(() => alert("Erro ao copiar o código Pix."));
+    if (!paymentData?.qr_code) return;
+    navigator.clipboard.writeText(paymentData.qr_code);
+    alert("QR Code copiado para a área de transferência!");
   };
 
+  const minutos = Math.floor(countdown / 60);
+  const segundos = countdown % 60;
+
   return (
-    <div style={{ padding: "2rem", backgroundColor: "#f5f5f5", minHeight: "100vh" }}>
-      <h2 style={{ textAlign: "center", color: "#2e7d32", fontSize: 28 }}>
+    <div className="min-h-screen bg-gray-50 py-10 px-4">
+      <h2 className="text-center text-3xl font-semibold text-green-700 mb-10">
         🎁 Lista de Presentes
       </h2>
 
-      {showSuccess && (
-        <div
-          style={{
-            backgroundColor: "#d4edda",
-            color: "#155724",
-            padding: "1rem",
-            borderRadius: "8px",
-            margin: "20px auto",
-            textAlign: "center",
-            maxWidth: "500px",
-            fontWeight: "bold",
-            fontSize: "16px",
-            opacity: fadeOut ? 0 : 1,
-            transform: fadeOut ? "translateY(-10px)" : "translateY(0)",
-            transition: "opacity 1s ease, transform 1s ease",
-          }}
-        >
-          ✅ Pagamento confirmado com sucesso!
-        </div>
-      )}
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
-          gap: "1.5rem",
-          marginTop: "2rem",
-        }}
-      >
+      {/* Grade de presentes */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
         {presentes.map((p) => (
-          <div
+          <motion.div
             key={p.id}
-            style={{
-              backgroundColor: "white",
-              padding: "1rem",
-              borderRadius: "10px",
-              boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
-              textAlign: "center",
-              transition: "transform 0.2s ease",
-            }}
+            className="bg-white p-4 rounded-2xl shadow-md text-center hover:shadow-lg transition-all"
+            whileHover={{ scale: 1.02 }}
           >
             {p.imagemUrl && (
-              <div
-                style={{
-                  width: "100%",
-                  height: "220px",
-                  backgroundColor: "#fafafa",
-                  borderRadius: "8px",
-                  overflow: "hidden",
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  marginBottom: "10px",
-                }}
-              >
-                <img
-                  src={p.imagemUrl}
-                  alt={p.nome}
-                  style={{
-                    maxWidth: "100%",
-                    maxHeight: "100%",
-                    objectFit: "contain", // 🔹 não corta, mantém proporção
-                    borderRadius: "6px",
-                    transition: "transform 0.3s ease",
-                  }}
-                  onMouseOver={(e) => (e.currentTarget.style.transform = "scale(1.05)")}
-                  onMouseOut={(e) => (e.currentTarget.style.transform = "scale(1.0)")}
-                />
-              </div>
+              <img
+                src={p.imagemUrl}
+                alt={p.nome}
+                className="w-full h-48 object-cover rounded-xl mb-4"
+              />
             )}
-
-            <h3 style={{ color: "#2e7d32", marginBottom: "0.5rem" }}>{p.nome}</h3>
-            <p>
+            <h3 className="text-green-700 text-lg font-semibold mb-1">
+              {p.nome}
+            </h3>
+            <p className="text-gray-600 mb-4">
               <strong>Valor:</strong> R$ {Number(p.preco).toFixed(2)}
             </p>
-
             <button
               onClick={() => reservar(p)}
-              disabled={loadingId === p.id}
-              style={{
-                backgroundColor: "#2e7d32",
-                color: "#fff",
-                padding: "10px 15px",
-                borderRadius: 8,
-                marginTop: "10px",
-                cursor: "pointer",
-                opacity: loadingId === p.id ? 0.7 : 1,
-              }}
+              className="bg-green-600 text-white px-5 py-2 rounded-lg font-medium hover:bg-green-700 transition"
             >
-              {loadingId === p.id ? "Gerando..." : "Presentear 🎁"}
+              Presentear 🎁
             </button>
-          </div>
+          </motion.div>
         ))}
       </div>
 
-      {qrCode && selectedGift && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100vw",
-            height: "100vh",
-            backgroundColor: "rgba(0,0,0,0.6)",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: 1000,
-          }}
-          onClick={() => setQrCode(null)}
-        >
-          <div
-            style={{
-              backgroundColor: "#fff",
-              padding: "2rem",
-              borderRadius: "12px",
-              textAlign: "center",
-              boxShadow: "0 8px 20px rgba(0,0,0,0.3)",
-              maxWidth: "400px",
-            }}
-            onClick={(e) => e.stopPropagation()}
+      {/* 🔹 Modal de confirmação */}
+      <AnimatePresence>
+        {selectedGift && !paymentData && (
+          <motion.div
+            className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
           >
-            <h3 style={{ color: "#2e7d32" }}>Pagamento de {selectedGift.nome}</h3>
-
-            <img
-              src={qrCode}
-              alt="QR Code Pagamento"
-              style={{
-                marginTop: "1rem",
-                width: "250px",
-                height: "250px",
-                borderRadius: "10px",
-              }}
-            />
-
-            <p style={{ marginTop: "1rem" }}>
-              Escaneie com o app do Mercado Pago ou copie o código abaixo 👇
-            </p>
-
-            {copyCode && (
-              <div style={{ marginTop: "1rem" }}>
-                <input
-                  type="text"
-                  readOnly
-                  value={copyCode}
-                  style={{
-                    width: "100%",
-                    padding: "8px",
-                    borderRadius: 6,
-                    border: "1px solid #ccc",
-                    textAlign: "center",
-                    fontSize: "12px",
-                  }}
-                />
+            <motion.div
+              className="bg-white p-8 rounded-2xl max-w-sm w-full text-center shadow-xl"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+            >
+              <h3 className="text-xl font-semibold text-green-700 mb-3">
+                Confirmar Presente
+              </h3>
+              <p className="text-gray-700 mb-6">
+                Deseja reservar <strong>{selectedGift.nome}</strong> por{" "}
+                <strong>R$ {Number(selectedGift.preco).toFixed(2)}</strong>?
+              </p>
+              <div className="flex justify-center gap-4">
                 <button
-                  onClick={copiarQRCode}
-                  style={{
-                    marginTop: 8,
-                    backgroundColor: "#2e7d32",
-                    color: "#fff",
-                    padding: "6px 12px",
-                    borderRadius: 6,
-                    cursor: "pointer",
-                    fontSize: "14px",
-                  }}
+                  onClick={confirmarReserva}
+                  className="bg-green-600 text-white px-5 py-2 rounded-lg hover:bg-green-700 transition"
                 >
-                  Copiar código Pix
+                  Sim, gerar pagamento
+                </button>
+                <button
+                  onClick={() => setSelectedGift(null)}
+                  className="bg-gray-300 text-gray-800 px-5 py-2 rounded-lg hover:bg-gray-400 transition"
+                >
+                  Cancelar
                 </button>
               </div>
-            )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-            <button
-              onClick={() => setQrCode(null)}
-              style={{
-                marginTop: "1rem",
-                backgroundColor: "#2e7d32",
-                color: "#fff",
-                padding: "8px 16px",
-                borderRadius: 8,
-                cursor: "pointer",
-              }}
+      {/* 🔹 Modal QR Code */}
+      <AnimatePresence>
+        {paymentData && (
+          <motion.div
+            className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="bg-white p-6 rounded-2xl text-center shadow-lg max-w-sm w-full"
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
             >
-              Fechar
-            </button>
-          </div>
-        </div>
-      )}
+              <h3 className="text-green-700 font-semibold text-xl mb-2">
+                Pagamento de {selectedGift.nome}
+              </h3>
+              <p className="text-gray-600 mb-3">
+                Escaneie o QR Code abaixo. Expira em:
+              </p>
+              <p className="text-lg font-semibold text-red-600 mb-4">
+                {minutos}:{segundos.toString().padStart(2, "0")}
+              </p>
+              {paymentData.qr_base64 && (
+                <img
+                  src={`data:image/png;base64,${paymentData.qr_base64}`}
+                  alt="QR Code Pix"
+                  className="mx-auto w-56 h-56 rounded-lg border mb-3"
+                />
+              )}
+              <input
+                type="text"
+                value={paymentData.qr_code || ""}
+                readOnly
+                className="w-full border rounded-lg p-2 text-center text-sm text-gray-600 mb-2"
+              />
+              <button
+                onClick={copiarQRCode}
+                className="bg-green-600 text-white px-4 py-2 rounded-lg w-full hover:bg-green-700 transition"
+              >
+                Copiar QR Code
+              </button>
+              <button
+                onClick={() => setPaymentData(null)}
+                className="mt-4 text-gray-600 underline text-sm"
+              >
+                Fechar
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 🔹 Popup de sucesso */}
+      <AnimatePresence>
+        {showSuccess && (
+          <motion.div
+            className="fixed inset-0 flex justify-center items-center bg-black bg-opacity-50 z-50"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowSuccess(false)}
+          >
+            <motion.div
+              className="bg-white p-8 rounded-2xl text-center shadow-lg max-w-xs w-full"
+              onClick={(e) => e.stopPropagation()}
+              initial={{ scale: 0.8 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.8 }}
+            >
+              <h3 className="text-green-700 text-xl font-semibold mb-3">
+                💚 Pagamento Confirmado!
+              </h3>
+              <p className="text-gray-700 mb-4">
+                Seu presente foi recebido com sucesso. Muito obrigado! 🎉
+              </p>
+              <button
+                onClick={() => setShowSuccess(false)}
+                className="bg-green-600 text-white px-5 py-2 rounded-lg hover:bg-green-700 transition"
+              >
+                Fechar
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
