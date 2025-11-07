@@ -17,16 +17,14 @@ app.use(cors());
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ⚙️ Configuração do Firebase (compatível com Render e local)
+// ⚙️ Configuração do Firebase (Render + local)
 let serviceAccount;
 try {
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-    // Lê a credencial do Firebase via variável de ambiente (base64)
     const decoded = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT, "base64").toString("utf8");
     serviceAccount = JSON.parse(decoded);
     console.log("🔥 Firebase service account carregado via variável de ambiente");
   } else {
-    // Usa o arquivo local quando rodando em ambiente de desenvolvimento
     const serviceAccountPath = path.join(__dirname, "service-account.json");
     serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, "utf8"));
     console.log("🔥 Firebase service account carregado via arquivo local");
@@ -39,33 +37,43 @@ try {
   console.error("❌ Erro ao carregar credenciais do Firebase:", error);
 }
 
+const db = admin.firestore();
+
 // ⚙️ Configuração Mercado Pago
 const client = new MercadoPagoConfig({
   accessToken: process.env.MP_ACCESS_TOKEN,
 });
 const payment = new Payment(client);
 
-// 📦 Rotas principais
+// 🏠 Rota base
 app.get("/", (req, res) => {
   res.send("Servidor do casamento Diego & Yasmin está rodando 💍");
 });
 
-// 💰 Rota para gerar pagamento PIX
-app.post("/create_preference", async (req, res) => {
+// 💰 Criação de pagamento PIX
+app.post("/create_payment", async (req, res) => {
   try {
-    const { title, price } = req.body;
+    const { title, amount, presentId } = req.body;
+
+    if (!title || !amount) {
+      return res.status(400).json({ error: "Título e valor são obrigatórios." });
+    }
+
     const body = {
-      transaction_amount: Number(price),
+      transaction_amount: Number(amount),
       description: title,
       payment_method_id: "pix",
       payer: { email: "teste@teste.com" },
+      metadata: { presentId },
     };
 
     const result = await payment.create({ body });
+
     res.status(200).json({
-      qr_code: result.point_of_interaction.transaction_data.qr_code,
-      qr_code_base64: result.point_of_interaction.transaction_data.qr_code_base64,
       id: result.id,
+      qr_code: result.point_of_interaction.transaction_data.qr_code,
+      qr_base64: result.point_of_interaction.transaction_data.qr_code_base64,
+      init_point: result.init_point,
     });
   } catch (error) {
     console.error("❌ Erro ao criar pagamento:", error);
@@ -83,12 +91,22 @@ app.post("/webhook", async (req, res) => {
       return res.sendStatus(400);
     }
 
+    // Buscar detalhes do pagamento
     const response = await payment.get({ id: paymentId });
     const status = response.status;
+    const presentId = response.metadata?.presentId;
 
-    if (status === "approved") {
-      console.log("✅ Pagamento aprovado!");
-      // Atualize o Firestore ou envie notificação ao frontend se necessário
+    if (status === "approved" && presentId) {
+      console.log("✅ Pagamento aprovado para o presente:", presentId);
+
+      // Atualizar Firestore com status de pagamento
+      const presentRef = db.collection("presents").doc(presentId);
+      await presentRef.update({
+        "payment.status": "paid",
+        "payment.updatedAt": admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      console.log(`🎉 Presente ${presentId} atualizado como pago no Firestore`);
     } else {
       console.log("ℹ️ Pagamento ainda não aprovado:", status);
     }
