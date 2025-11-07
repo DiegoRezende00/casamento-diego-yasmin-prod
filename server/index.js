@@ -81,6 +81,7 @@ app.use(
 // ======================
 app.get("/", (req, res) => res.send("Servidor do Casamento está rodando 🚀"));
 
+// Criar pagamento Pix
 app.post("/create_payment", async (req, res) => {
   try {
     const { presentId, amount, title } = req.body;
@@ -97,15 +98,23 @@ app.post("/create_payment", async (req, res) => {
 
     const txData = payment.point_of_interaction?.transaction_data || {};
 
-    // 🔹 Salva na subcoleção transactions do presente
+    // 🔹 Valida IDs
+    const presentIdStr = String(presentId).trim();
+    const paymentIdStr = String(payment.id).trim();
+
+    if (!presentIdStr || !paymentIdStr) {
+      return res.status(400).json({ error: "presentId ou paymentId inválido" });
+    }
+
+    // 🔹 Salva na subcoleção transactions
     const transRef = db
       .collection("presents")
-      .doc(presentId)
+      .doc(presentIdStr)
       .collection("transactions")
-      .doc(payment.id);
+      .doc(paymentIdStr);
 
     const paymentDoc = {
-      paymentId: payment.id,
+      paymentId: paymentIdStr,
       title,
       amount,
       qr_code: txData.qr_code || null,
@@ -124,9 +133,7 @@ app.post("/create_payment", async (req, res) => {
   }
 });
 
-// ======================
-// 📡 Webhook Mercado Pago
-// ======================
+// Webhook Mercado Pago
 app.post("/webhook", async (req, res) => {
   try {
     const paymentData = req.body?.data?.id;
@@ -134,11 +141,11 @@ app.post("/webhook", async (req, res) => {
 
     const paymentInfo = await new Payment(mp).get({ id: paymentData });
     const status = paymentInfo.status;
-    const paymentId = paymentInfo.id;
+    const paymentId = String(paymentInfo.id).trim();
+    if (!paymentId) return res.status(400).send("paymentId inválido");
 
     // 🔹 Busca transação em todos os presentes
     const presentsSnapshot = await db.collection("presents").get();
-
     let transFound = false;
 
     for (const presentDoc of presentsSnapshot.docs) {
@@ -161,9 +168,7 @@ app.post("/webhook", async (req, res) => {
       }
     }
 
-    if (!transFound) {
-      console.log(`⚠️ Nenhuma transação encontrada para paymentId: ${paymentId}`);
-    }
+    if (!transFound) console.log(`⚠️ Nenhuma transação encontrada para paymentId: ${paymentId}`);
 
     res.sendStatus(200);
   } catch (err) {
@@ -178,7 +183,7 @@ app.post("/webhook", async (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ Servidor rodando na porta ${PORT}`);
-  console.log(`🌍 Domínios permitidos (CORS):`);
+  console.log("🌍 Domínios permitidos (CORS):");
   allowedOrigins.forEach((o) => console.log("   -", o));
   console.log("   - (subdomínios temporários da Vercel habilitados)");
 });
