@@ -16,6 +16,7 @@ app.use(express.json());
 const allowedOrigins = [
   "https://casamento-diego-yasmin.vercel.app",
   "http://localhost:5173",
+  "https://casamento-diego-yasmin-prod.vercel.app",
 ];
 
 app.use(
