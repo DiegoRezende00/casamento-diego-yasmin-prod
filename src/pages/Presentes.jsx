@@ -1,4 +1,3 @@
-// Presentes.jsx (frontend)
 import React, { useEffect, useState, useRef } from "react";
 import { db } from "../firebase";
 import {
@@ -19,6 +18,7 @@ export default function Presentes() {
   const [copyCode, setCopyCode] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
   const [fadeOut, setFadeOut] = useState(false);
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false);
 
   const transUnsubRef = useRef(null);
 
@@ -48,6 +48,7 @@ export default function Presentes() {
       setQrCode(null);
       setCopyCode("");
       setSelectedGift(p);
+      setPaymentConfirmed(false);
 
       const { data } = await axios.post(
         `${import.meta.env.VITE_API_URL}/create_payment`,
@@ -78,17 +79,19 @@ export default function Presentes() {
       const unsubTrans = onDocSnapshot(transRef, (snap) => {
         if (!snap.exists()) return;
         const tx = snap.data();
+
+        // ✅ Pagamento confirmado
         if (tx.status === "paid" || tx.status === "approved") {
-          setQrCode(null);
-          setSelectedGift(null);
+          setPaymentConfirmed(true); // ativa o estado de confirmação
+          setQrCode(null); // remove QR code
           setCopyCode("");
-          setShowSuccess(true);
-          setTimeout(() => setFadeOut(true), 2000);
+
+          // aguarda 3s e fecha o modal automaticamente
           setTimeout(() => {
-            setShowSuccess(false);
-            setFadeOut(false);
-            window.location.reload();
-          }, 3000);
+            setPaymentConfirmed(false);
+            setSelectedGift(null);
+          }, 8000);
+
           try {
             unsubTrans();
           } catch (e) {}
@@ -127,31 +130,6 @@ export default function Presentes() {
       <h2 style={{ textAlign: "center", color: "#2e7d32", fontSize: 28 }}>
         🎁 Lista de Presentes
       </h2>
-
-      {/* 🔔 Banner de confirmação em tela cheia */}
-      {showSuccess && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100vw",
-            height: "100vh",
-            backgroundColor: "rgba(255,255,255,0.95)",
-            color: "#2e7d32",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            fontSize: "2rem",
-            fontWeight: "bold",
-            zIndex: 2000,
-            opacity: fadeOut ? 0 : 1,
-            transition: "opacity 1.5s ease",
-          }}
-        >
-          ✅ PAGAMENTO CONFIRMADO COM SUCESSO!
-        </div>
-      )}
 
       <div
         style={{
@@ -208,42 +186,27 @@ export default function Presentes() {
               <strong>Valor:</strong> R$ {Number(p.preco).toFixed(2)}
             </p>
 
-            {p.reservado || p?.payment?.status === "approved" || p?.payment?.status === "paid" ? (
-              <div
-                style={{
-                  backgroundColor: "#d4edda",
-                  color: "#155724",
-                  padding: "10px 15px",
-                  borderRadius: 8,
-                  marginTop: "10px",
-                  fontWeight: "bold",
-                }}
-              >
-                ✅ Presente já confirmado!
-              </div>
-            ) : (
-              <button
-                onClick={() => reservar(p)}
-                disabled={loadingId === p.id}
-                style={{
-                  backgroundColor: "#2e7d32",
-                  color: "#fff",
-                  padding: "10px 15px",
-                  borderRadius: 8,
-                  marginTop: "10px",
-                  cursor: "pointer",
-                  opacity: loadingId === p.id ? 0.7 : 1,
-                }}
-              >
-                {loadingId === p.id ? "Gerando..." : "Presentear 🎁"}
-              </button>
-            )}
+            <button
+              onClick={() => reservar(p)}
+              disabled={loadingId === p.id}
+              style={{
+                backgroundColor: "#2e7d32",
+                color: "#fff",
+                padding: "10px 15px",
+                borderRadius: 8,
+                marginTop: "10px",
+                cursor: "pointer",
+                opacity: loadingId === p.id ? 0.7 : 1,
+              }}
+            >
+              {loadingId === p.id ? "Gerando..." : "Presentear 🎁"}
+            </button>
           </div>
         ))}
       </div>
 
       {/* 🔹 Modal Pix */}
-      {qrCode && selectedGift && (
+      {(qrCode || paymentConfirmed) && selectedGift && (
         <div
           style={{
             position: "fixed",
@@ -257,7 +220,6 @@ export default function Presentes() {
             alignItems: "center",
             zIndex: 1000,
           }}
-          onClick={() => setQrCode(null)}
         >
           <div
             style={{
@@ -267,71 +229,79 @@ export default function Presentes() {
               textAlign: "center",
               boxShadow: "0 8px 20px rgba(0,0,0,0.3)",
               maxWidth: "400px",
+              width: "90%",
+              transition: "all 0.3s ease",
             }}
-            onClick={(e) => e.stopPropagation()}
           >
-            <h3 style={{ color: "#2e7d32" }}>Pagamento de {selectedGift.nome}</h3>
+            {/* Se o pagamento foi confirmado, mostra mensagem */}
+            {paymentConfirmed ? (
+              <div
+                style={{
+                  color: "#2e7d32",
+                  fontSize: "1.8rem",
+                  fontWeight: "bold",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  minHeight: "250px",
+                  animation: "fadeIn 0.8s ease",
+                }}
+              >
+                ✅ Pagamento confirmado com sucesso!
+              </div>
+            ) : (
+              <>
+                <h3 style={{ color: "#2e7d32" }}>Pagamento de {selectedGift.nome}</h3>
 
-            <img
-              src={qrCode}
-              alt="QR Code Pagamento"
-              style={{
-                marginTop: "1rem",
-                width: "250px",
-                height: "250px",
-                borderRadius: "10px",
-              }}
-            />
-
-            <p style={{ marginTop: "1rem" }}>
-              Escaneie com o app do Mercado Pago ou copie o código abaixo 👇
-            </p>
-
-            {copyCode && (
-              <div style={{ marginTop: "1rem" }}>
-                <input
-                  type="text"
-                  readOnly
-                  value={copyCode}
+                <img
+                  src={qrCode}
+                  alt="QR Code Pagamento"
                   style={{
-                    width: "100%",
-                    padding: "8px",
-                    borderRadius: 6,
-                    border: "1px solid #ccc",
-                    textAlign: "center",
-                    fontSize: "12px",
+                    marginTop: "1rem",
+                    width: "250px",
+                    height: "250px",
+                    borderRadius: "10px",
                   }}
                 />
-                <button
-                  onClick={copiarQRCode}
-                  style={{
-                    marginTop: 8,
-                    backgroundColor: "#2e7d32",
-                    color: "#fff",
-                    padding: "6px 12px",
-                    borderRadius: 6,
-                    cursor: "pointer",
-                    fontSize: "14px",
-                  }}
-                >
-                  Copiar código Pix
-                </button>
-              </div>
-            )}
 
-            <button
-              onClick={() => setQrCode(null)}
-              style={{
-                marginTop: "1rem",
-                backgroundColor: "#2e7d32",
-                color: "#fff",
-                padding: "8px 16px",
-                borderRadius: 8,
-                cursor: "pointer",
-              }}
-            >
-              Fechar
-            </button>
+                <p style={{ marginTop: "1rem" }}>
+                  Escaneie com o app do Mercado Pago ou copie o código abaixo 👇
+                </p>
+
+                {copyCode && (
+                  <div style={{ marginTop: "1rem" }}>
+                    <input
+                      type="text"
+                      readOnly
+                      value={copyCode}
+                      style={{
+                        width: "100%",
+                        padding: "8px",
+                        borderRadius: 6,
+                        border: "1px solid #ccc",
+                        textAlign: "center",
+                        fontSize: "12px",
+                      }}
+                    />
+                    <button
+                      onClick={copiarQRCode}
+                      style={{
+                        marginTop: 8,
+                        backgroundColor: "#2e7d32",
+                        color: "#fff",
+                        padding: "6px 12px",
+                        borderRadius: 6,
+                        cursor: "pointer",
+                        fontSize: "14px",
+                      }}
+                    >
+                      Copiar código Pix
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}
