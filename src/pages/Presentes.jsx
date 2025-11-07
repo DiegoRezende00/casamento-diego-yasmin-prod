@@ -8,33 +8,35 @@ export default function Presentes() {
   const [loadingId, setLoadingId] = useState(null);
   const [qrCode, setQrCode] = useState(null);
   const [selectedGift, setSelectedGift] = useState(null);
+  const [copyCode, setCopyCode] = useState("");
+  const [showSuccess, setShowSuccess] = useState(false);
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "presents"), (snapshot) => {
-      const lista = snapshot.docs.map((doc) => {
-        const data = doc.data();
-        // 🔹 Checar se passou 1 hora e desbloquear
-        if (data.payment?.blockedAt) {
-          const blockedTime = data.payment.blockedAt.toDate ? data.payment.blockedAt.toDate() : new Date(data.payment.blockedAt);
-          if (Date.now() - blockedTime.getTime() > 3600_000 && data.payment.status !== "paid") {
-            data.reservado = false;
-          } else if (!data.reservado) {
-            data.reservado = true;
-          }
-        }
-        return { id: doc.id, ...data };
-      });
+      const lista = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       setPresentes(lista);
+
+      // 🔹 Fecha o QR automaticamente se o pagamento for confirmado
+      if (selectedGift) {
+        const updatedGift = lista.find((p) => p.id === selectedGift.id);
+        if (updatedGift?.payment?.status === "paid") {
+          setQrCode(null);
+          setSelectedGift(null);
+          setCopyCode("");
+          setShowSuccess(true);
+
+          // Mostra mensagem de sucesso por 3s e recarrega
+          setTimeout(() => {
+            setShowSuccess(false);
+            window.location.reload();
+          }, 3000);
+        }
+      }
     });
     return () => unsub();
-  }, []);
+  }, [selectedGift]);
 
   const reservar = async (p) => {
-    if (p.reservado) {
-      alert("Este presente já foi reservado ❤️");
-      return;
-    }
-
     const confirm = window.confirm(
       `Deseja reservar "${p.nome}" por R$ ${Number(p.preco).toFixed(2)}?`
     );
@@ -43,59 +45,41 @@ export default function Presentes() {
     try {
       setLoadingId(p.id);
       setQrCode(null);
+      setSelectedGift(p);
 
       const { data } = await axios.post(
         `${import.meta.env.VITE_API_URL}/create_payment`,
-        {
-          title: p.nome,
-          amount: p.preco,
-          presentId: p.id,
-        }
+        { title: p.nome, amount: p.preco, presentId: p.id }
       );
 
-      console.log("Resposta completa do backend:", data);
-
-      // 🔹 Salvar QR Code como imagem base64
       if (data.qr_base64) {
         setQrCode(`data:image/png;base64,${data.qr_base64}`);
-      } else if (data.init_point) {
-        window.open(data.init_point, "_blank");
-      } else {
-        console.error("Erro: resposta inesperada do servidor", data);
-        alert("Erro: resposta inesperada do servidor. Confira o console.");
       }
 
-      // 🔹 Salvar QR Code de texto no selectedGift para mostrar no modal
-      const qrCodeText = data.qr_code || null;
-      setSelectedGift({ ...p, payment: { qr_code: qrCodeText } });
+      if (data.qr_code) {
+        setCopyCode(data.qr_code);
+      }
 
-      // 🔹 Bloquear botão imediatamente no Firestore
+      // 🔹 Atualiza Firestore (apenas bloqueia momentaneamente)
       const presentRef = doc(db, "presents", p.id);
       await updateDoc(presentRef, {
-        reservado: true,
         "payment.blockedAt": serverTimestamp(),
-        "payment.qr_code": qrCodeText,
+        "payment.status": "pending",
       });
 
     } catch (err) {
-      if (err.response) {
-        console.error("Erro no servidor:", err.response.data, err.response.status);
-      } else if (err.request) {
-        console.error("Erro na requisição (sem resposta):", err.request);
-      } else {
-        console.error("Erro inesperado:", err.message);
-      }
-      alert("Erro ao iniciar o pagamento. Veja o console para detalhes.");
+      console.error("Erro ao criar pagamento:", err);
+      alert("Erro ao iniciar o pagamento. Veja o console.");
     } finally {
       setLoadingId(null);
     }
   };
 
   const copiarQRCode = () => {
-    if (!selectedGift?.payment?.qr_code) return;
-    navigator.clipboard.writeText(selectedGift.payment.qr_code)
-      .then(() => alert("QR Code copiado para a área de transferência!"))
-      .catch(() => alert("Erro ao copiar o QR Code."));
+    if (!copyCode) return;
+    navigator.clipboard.writeText(copyCode)
+      .then(() => alert("Código Pix copiado!"))
+      .catch(() => alert("Erro ao copiar o código Pix."));
   };
 
   return (
@@ -103,6 +87,24 @@ export default function Presentes() {
       <h2 style={{ textAlign: "center", color: "#2e7d32", fontSize: 28 }}>
         🎁 Lista de Presentes
       </h2>
+
+      {/* ✅ Mensagem de sucesso */}
+      {showSuccess && (
+        <div
+          style={{
+            backgroundColor: "#d4edda",
+            color: "#155724",
+            padding: "1rem",
+            borderRadius: "8px",
+            margin: "20px auto",
+            textAlign: "center",
+            maxWidth: "500px",
+            fontWeight: "bold",
+          }}
+        >
+          ✅ Pagamento confirmado com sucesso!
+        </div>
+      )}
 
       <div
         style={{
@@ -138,41 +140,23 @@ export default function Presentes() {
             )}
 
             <h3 style={{ color: "#2e7d32", marginBottom: "0.5rem" }}>{p.nome}</h3>
-            <p>
-              <strong>Valor:</strong> R$ {Number(p.preco).toFixed(2)}
-            </p>
+            <p><strong>Valor:</strong> R$ {Number(p.preco).toFixed(2)}</p>
 
-            {p.reservado ? (
-              <button
-                disabled
-                style={{
-                  backgroundColor: "#ccc",
-                  color: "#666",
-                  padding: "10px 15px",
-                  borderRadius: 8,
-                  marginTop: "10px",
-                  cursor: "not-allowed",
-                }}
-              >
-                Reservado 💝
-              </button>
-            ) : (
-              <button
-                onClick={() => reservar(p)}
-                disabled={loadingId === p.id}
-                style={{
-                  backgroundColor: "#2e7d32",
-                  color: "#fff",
-                  padding: "10px 15px",
-                  borderRadius: 8,
-                  marginTop: "10px",
-                  cursor: "pointer",
-                  opacity: loadingId === p.id ? 0.7 : 1,
-                }}
-              >
-                {loadingId === p.id ? "Gerando..." : "Reservar 🎁"}
-              </button>
-            )}
+            <button
+              onClick={() => reservar(p)}
+              disabled={loadingId === p.id}
+              style={{
+                backgroundColor: "#2e7d32",
+                color: "#fff",
+                padding: "10px 15px",
+                borderRadius: 8,
+                marginTop: "10px",
+                cursor: "pointer",
+                opacity: loadingId === p.id ? 0.7 : 1,
+              }}
+            >
+              {loadingId === p.id ? "Gerando..." : "Presentear 🎁"}
+            </button>
           </div>
         ))}
       </div>
@@ -205,9 +189,8 @@ export default function Presentes() {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 style={{ color: "#2e7d32" }}>
-              Pagamento de {selectedGift.nome}
-            </h3>
+            <h3 style={{ color: "#2e7d32" }}>Pagamento de {selectedGift.nome}</h3>
+
             <img
               src={qrCode}
               alt="QR Code Pagamento"
@@ -218,23 +201,24 @@ export default function Presentes() {
                 borderRadius: "10px",
               }}
             />
+
             <p style={{ marginTop: "1rem" }}>
-              Escaneie com o app do Mercado Pago para concluir o pagamento.
+              Escaneie com o app do Mercado Pago ou copie o código abaixo 👇
             </p>
 
-            {/* 🔹 Campo de texto com botão copiar */}
-            {selectedGift.payment?.qr_code && (
+            {copyCode && (
               <div style={{ marginTop: "1rem" }}>
                 <input
                   type="text"
                   readOnly
-                  value={selectedGift.payment.qr_code}
+                  value={copyCode}
                   style={{
                     width: "100%",
                     padding: "8px",
                     borderRadius: 6,
                     border: "1px solid #ccc",
                     textAlign: "center",
+                    fontSize: "12px",
                   }}
                 />
                 <button
@@ -246,9 +230,10 @@ export default function Presentes() {
                     padding: "6px 12px",
                     borderRadius: 6,
                     cursor: "pointer",
+                    fontSize: "14px",
                   }}
                 >
-                  Copiar QR Code
+                  Copiar código Pix
                 </button>
               </div>
             )}
