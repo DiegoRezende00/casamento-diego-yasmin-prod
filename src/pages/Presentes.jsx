@@ -1,6 +1,14 @@
-import React, { useEffect, useState } from "react";
+// Presentes.jsx (frontend) - pronto para colar
+import React, { useEffect, useState, useRef } from "react";
 import { db } from "../firebase";
-import { collection, onSnapshot, doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import {
+  collection,
+  onSnapshot,
+  doc,
+  updateDoc,
+  serverTimestamp,
+  onSnapshot as onDocSnapshot,
+} from "firebase/firestore";
 import axios from "axios";
 
 export default function Presentes() {
@@ -12,19 +20,79 @@ export default function Presentes() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [fadeOut, setFadeOut] = useState(false);
 
-  // 🔹 Escuta o Firestore em tempo real
+  // guarda unsubscribe do listener da transação ativa
+  const transUnsubRef = useRef(null);
+
+  // Escuta catálogo de presentes
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "presents"), (snapshot) => {
-      const lista = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      const lista = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
       setPresentes(lista);
+    });
+    return () => unsub();
+  }, []);
 
-      // Se o presente selecionado foi pago → fecha o QR e mostra mensagem
-      if (selectedGift) {
-        const updatedGift = lista.find((p) => p.id === selectedGift.id);
-        if (
-          updatedGift?.payment?.status === "paid" ||
-          updatedGift?.payment?.status === "approved"
-        ) {
+  // função para iniciar reserva / pagamento
+  const reservar = async (p) => {
+    const confirm = window.confirm(
+      `Deseja presentear "${p.nome}" por R$ ${Number(p.preco).toFixed(2)}?`
+    );
+    if (!confirm) return;
+
+    try {
+      // cancela listener anterior se houver
+      if (transUnsubRef.current) {
+        try { transUnsubRef.current(); } catch (e) {}
+        transUnsubRef.current = null;
+      }
+
+      setLoadingId(p.id);
+      setQrCode(null);
+      setCopyCode("");
+      setSelectedGift(p);
+
+      console.log("📦 Enviando pagamento:", {
+        title: p.nome,
+        amount: p.preco,
+        presentId: p.id,
+      });
+
+      const { data } = await axios.post(
+        `${import.meta.env.VITE_API_URL}/create_payment`,
+        { title: p.nome, amount: p.preco, presentId: p.id },
+        { headers: { "Content-Type": "application/json" } }
+      );
+
+      console.log("✅ Resposta do backend:", data);
+
+      const mp_id = data.mp_id || data.id || null;
+      if (!mp_id) {
+        alert("Erro: mp_id ausente na resposta do servidor.");
+        return;
+      }
+
+      if (data.qr_base64) setQrCode(`data:image/png;base64,${data.qr_base64}`);
+      if (data.qr_code) setCopyCode(data.qr_code);
+
+      // Opcional: marca present com último pagamento (não impede múltiplas)
+      try {
+        const presentRef = doc(db, "presents", p.id);
+        await updateDoc(presentRef, {
+          "payment.lastMp": mp_id,
+          "payment.lastCreatedAt": serverTimestamp(),
+        });
+      } catch (e) {
+        console.warn("⚠️ Não foi possível atualizar present.lastMp (não crítico)", e);
+      }
+
+      // Escuta apenas a transação criada: presents/{presentId}/transactions/{mp_id}
+      const transRef = doc(db, "presents", p.id, "transactions", mp_id);
+      const unsubTrans = onDocSnapshot(transRef, (snap) => {
+        if (!snap.exists()) return;
+        const tx = snap.data();
+        console.log("🔔 Atualização da transação:", tx);
+        if (tx.status === "paid" || tx.status === "approved") {
+          // sucesso: fecha modal e mostra mensagem
           setQrCode(null);
           setSelectedGift(null);
           setCopyCode("");
@@ -36,53 +104,22 @@ export default function Presentes() {
             setFadeOut(false);
             window.location.reload();
           }, 3000);
+
+          // cancela listener
+          try { unsubTrans(); } catch (e) {}
+          transUnsubRef.current = null;
+        } else if (["cancelled", "rejected", "expired"].includes(tx.status)) {
+          // fechar modal e mostrar erro simples
+          setQrCode(null);
+          setSelectedGift(null);
+          setCopyCode("");
+          alert("Pagamento cancelado ou expirado. Tente novamente.");
+          try { unsubTrans(); } catch (e) {}
+          transUnsubRef.current = null;
         }
-      }
-    });
-    return () => unsub();
-  }, [selectedGift]);
-
-  // 💰 Criar pagamento PIX
-  const reservar = async (p) => {
-    const confirm = window.confirm(
-      `Deseja presentear "${p.nome}" por R$ ${Number(p.preco).toFixed(2)}?`
-    );
-    if (!confirm) return;
-
-    try {
-      setLoadingId(p.id);
-      setQrCode(null);
-      setSelectedGift(p);
-
-      console.log("📦 Enviando pagamento:", {
-        title: p.nome,
-        amount: p.preco,
-        presentId: p.id,
       });
 
-      const { data } = await axios.post(
-        `${import.meta.env.VITE_API_URL}/create_payment`,
-        {
-          title: p.nome,
-          amount: p.preco,
-          presentId: p.id,
-        },
-        {
-          headers: { "Content-Type": "application/json" },
-        }
-      );
-
-      console.log("✅ Resposta do backend:", data);
-
-      if (data.qr_base64) setQrCode(`data:image/png;base64,${data.qr_base64}`);
-      if (data.qr_code) setCopyCode(data.qr_code);
-
-      // Atualiza Firestore: bloqueio temporário
-      const presentRef = doc(db, "presents", p.id);
-      await updateDoc(presentRef, {
-        "payment.blockedAt": serverTimestamp(),
-        "payment.status": "pending",
-      });
+      transUnsubRef.current = unsubTrans;
     } catch (err) {
       console.error("❌ Erro ao criar pagamento:", err.response || err);
       alert("Erro ao iniciar o pagamento. Verifique o console.");
@@ -91,7 +128,6 @@ export default function Presentes() {
     }
   };
 
-  // 📋 Copiar código Pix
   const copiarQRCode = () => {
     if (!copyCode) return;
     navigator.clipboard
@@ -127,7 +163,6 @@ export default function Presentes() {
         </div>
       )}
 
-      {/* Lista de presentes */}
       <div
         style={{
           display: "grid",
@@ -183,7 +218,6 @@ export default function Presentes() {
         ))}
       </div>
 
-      {/* Modal QR Code */}
       {qrCode && selectedGift && (
         <div
           style={{
