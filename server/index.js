@@ -20,23 +20,35 @@ const __dirname = path.dirname(__filename);
 
 let serviceAccount;
 
-if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-  serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-  console.log("✅ Credenciais Firebase carregadas das variáveis de ambiente");
-} else {
-  const serviceAccountPath = path.join(__dirname, "service-account.json");
-  if (fs.existsSync(serviceAccountPath)) {
-    serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, "utf8"));
-    console.log("✅ Credenciais Firebase carregadas do arquivo local");
+try {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
+    // ✅ Decodifica variável Base64
+    const decoded = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64, "base64").toString("utf-8");
+    serviceAccount = JSON.parse(decoded);
+    console.log("✅ Credenciais Firebase carregadas de FIREBASE_SERVICE_ACCOUNT_BASE64");
+  } else if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    // Suporte opcional ao JSON puro em string (sem Base64)
+    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    console.log("✅ Credenciais Firebase carregadas de FIREBASE_SERVICE_ACCOUNT (JSON)");
   } else {
-    console.error("❌ Nenhuma credencial Firebase encontrada!");
-    process.exit(1);
+    // Modo local (arquivo físico)
+    const serviceAccountPath = path.join(__dirname, "service-account.json");
+    if (fs.existsSync(serviceAccountPath)) {
+      serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, "utf8"));
+      console.log("✅ Credenciais Firebase carregadas do arquivo local");
+    } else {
+      throw new Error("❌ Nenhuma credencial Firebase encontrada!");
+    }
   }
+
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+} catch (err) {
+  console.error("❌ Erro ao inicializar Firebase:", err.message);
+  process.exit(1);
 }
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
 const db = admin.firestore();
 
 // ======================
@@ -60,11 +72,7 @@ const vercelPattern = /^https:\/\/casamento-diego-yasmin-prod-[a-z0-9]+\.vercel\
 app.use(
   cors({
     origin: function (origin, callback) {
-      if (
-        !origin ||
-        allowedOrigins.includes(origin) ||
-        vercelPattern.test(origin)
-      ) {
+      if (!origin || allowedOrigins.includes(origin) || vercelPattern.test(origin)) {
         callback(null, true);
       } else {
         console.log("❌ Bloqueado por CORS:", origin);
@@ -92,7 +100,6 @@ app.post("/create_payment", async (req, res) => {
       return res.status(400).json({ error: "Dados incompletos" });
     }
 
-    // Criação no Mercado Pago
     const payment = await new Payment(mp).create({
       body: {
         transaction_amount: Number(amount),
@@ -104,7 +111,6 @@ app.post("/create_payment", async (req, res) => {
 
     const txData = payment.point_of_interaction?.transaction_data || {};
 
-    // Criação do registro de pagamento no Firestore
     const paymentDoc = {
       presentId,
       title,
@@ -118,18 +124,14 @@ app.post("/create_payment", async (req, res) => {
     };
 
     const newDoc = await db.collection("payments").add(paymentDoc);
-
     res.json({ ...paymentDoc, id: newDoc.id });
   } catch (err) {
     console.error("❌ Erro ao criar pagamento:", err);
-    res.status(500).json({
-      error: "Erro ao criar pagamento",
-      detail: err.message,
-    });
+    res.status(500).json({ error: "Erro ao criar pagamento", detail: err.message });
   }
 });
 
-// Webhook de confirmação Mercado Pago
+// Webhook Mercado Pago
 app.post("/webhook", async (req, res) => {
   try {
     const paymentData = req.body?.data?.id;
@@ -139,7 +141,6 @@ app.post("/webhook", async (req, res) => {
     const status = paymentInfo.status;
     const paymentId = paymentInfo.id;
 
-    // Encontrar e atualizar o registro no Firestore
     const snapshot = await db.collection("payments").where("paymentId", "==", paymentId).get();
 
     if (!snapshot.empty) {
@@ -149,11 +150,13 @@ app.post("/webhook", async (req, res) => {
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
       console.log(`✅ Pagamento ${paymentId} atualizado para ${status}`);
+    } else {
+      console.log(`⚠️ Nenhum documento encontrado para paymentId: ${paymentId}`);
     }
 
     res.sendStatus(200);
   } catch (err) {
-    console.error("Erro no webhook:", err);
+    console.error("❌ Erro no webhook:", err);
     res.sendStatus(500);
   }
 });
