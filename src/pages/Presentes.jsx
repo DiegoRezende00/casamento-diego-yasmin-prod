@@ -21,7 +21,6 @@ export default function Presentes() {
       // Se o presente selecionado foi pago → fecha o QR e mostra mensagem
       if (selectedGift) {
         const updatedGift = lista.find((p) => p.id === selectedGift.id);
-
         if (
           updatedGift?.payment?.status === "paid" ||
           updatedGift?.payment?.status === "approved"
@@ -31,7 +30,6 @@ export default function Presentes() {
           setCopyCode("");
           setShowSuccess(true);
 
-          // Fade-out suave antes do reload
           setTimeout(() => setFadeOut(true), 2000);
           setTimeout(() => {
             setShowSuccess(false);
@@ -41,7 +39,6 @@ export default function Presentes() {
         }
       }
     });
-
     return () => unsub();
   }, [selectedGift]);
 
@@ -57,23 +54,38 @@ export default function Presentes() {
       setQrCode(null);
       setSelectedGift(p);
 
+      console.log("📦 Enviando pagamento:", {
+        title: p.nome,
+        amount: p.preco,
+        presentId: p.id,
+      });
+
       const { data } = await axios.post(
         `${import.meta.env.VITE_API_URL}/create_payment`,
-        { title: p.nome, amount: p.preco, presentId: p.id }
+        {
+          title: p.nome,
+          amount: p.preco,
+          presentId: p.id,
+        },
+        {
+          headers: { "Content-Type": "application/json" },
+        }
       );
+
+      console.log("✅ Resposta do backend:", data);
 
       if (data.qr_base64) setQrCode(`data:image/png;base64,${data.qr_base64}`);
       if (data.qr_code) setCopyCode(data.qr_code);
 
-      // Atualiza Firestore apenas com bloqueio temporário
+      // Atualiza Firestore: bloqueio temporário
       const presentRef = doc(db, "presents", p.id);
       await updateDoc(presentRef, {
         "payment.blockedAt": serverTimestamp(),
         "payment.status": "pending",
       });
     } catch (err) {
-      console.error("Erro ao criar pagamento:", err);
-      alert("Erro ao iniciar o pagamento. Veja o console.");
+      console.error("❌ Erro ao criar pagamento:", err.response || err);
+      alert("Erro ao iniciar o pagamento. Verifique o console.");
     } finally {
       setLoadingId(null);
     }
@@ -94,7 +106,6 @@ export default function Presentes() {
         🎁 Lista de Presentes
       </h2>
 
-      {/* ✅ Mensagem de sucesso animada */}
       {showSuccess && (
         <div
           style={{
@@ -134,7 +145,6 @@ export default function Presentes() {
               borderRadius: "10px",
               boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
               textAlign: "center",
-              transition: "transform 0.2s ease",
             }}
           >
             {p.imagemUrl && (
@@ -173,7 +183,7 @@ export default function Presentes() {
         ))}
       </div>
 
-      {/* Modal de QR Code */}
+      {/* Modal QR Code */}
       {qrCode && selectedGift && (
         <div
           style={{
