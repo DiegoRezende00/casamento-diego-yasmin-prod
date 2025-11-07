@@ -1,3 +1,4 @@
+// index.js (backend) - pronto para deploy (Render / Vercel server)
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -12,6 +13,7 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 
+// ==== CORS: permitir seu domínio de produção e localhost + preview Vercel ====
 const allowedOrigins = [
   "https://casamento-diego-yasmin.vercel.app",
   "https://casamento-diego-yasmin-prod.vercel.app",
@@ -21,27 +23,39 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) callback(null, true);
-      else {
-        console.warn(`🚫 Bloqueado por CORS: ${origin}`);
-        callback(new Error("CORS não permitido"));
+      if (!origin) return callback(null, true); // tools / server-to-server
+      // permitir previews do vercel com prefixo
+      if (
+        allowedOrigins.includes(origin) ||
+        origin.startsWith("https://casamento-diego-yasmin-prod-")
+      ) {
+        return callback(null, true);
       }
+      console.warn("🚫 Bloqueado por CORS:", origin);
+      return callback(new Error("CORS não permitido"));
     },
+    credentials: true,
   })
 );
 
+// ==== __dirname utilitário (ESM) ====
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// 🔥 Firebase Init
+// ==== Firebase init (env FIREBASE_SERVICE_ACCOUNT base64 OR local file) ====
 let serviceAccount;
 try {
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    // variável deve ser o JSON codificado em base64
     const decoded = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT, "base64").toString("utf8");
     serviceAccount = JSON.parse(decoded);
     console.log("✅ Firebase service account carregado via variável de ambiente");
   } else {
+    // fallback (apenas para dev)
     const serviceAccountPath = path.join(__dirname, "service-account.json");
+    if (!fs.existsSync(serviceAccountPath)) {
+      throw new Error("service-account.json não encontrado e FIREBASE_SERVICE_ACCOUNT não setada");
+    }
     serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, "utf8"));
     console.log("✅ Firebase service account carregado via arquivo local");
   }
@@ -51,27 +65,31 @@ try {
       credential: admin.credential.cert(serviceAccount),
     });
   }
-} catch (error) {
-  console.error("❌ Erro ao inicializar Firebase:", error);
+} catch (err) {
+  console.error("❌ Erro ao inicializar Firebase:", err);
+  // não exit here for safety in some hosts, but requests using DB will fail
 }
 
 const db = admin.firestore();
 
-const client = new MercadoPagoConfig({
+// ==== Mercado Pago client ====
+const mpClient = new MercadoPagoConfig({
   accessToken: process.env.MP_ACCESS_TOKEN,
 });
-const payment = new Payment(client);
+const mpPayment = new Payment(mpClient);
 
-// 🏠 Health check
+// ==== Healthcheck ====
 app.get("/", (req, res) => {
   res.send("💍 API do Casamento Diego & Yasmin funcionando!");
 });
 
-// 💸 Criar pagamento PIX
+// ==== Cria pagamento (PIX) ====
+// Recebe { title, amount, presentId } e cria:
+// - payments/{mp_id}
+// - presents/{presentId}/transactions/{mp_id}
 app.post("/create_payment", async (req, res) => {
   try {
-    const { title, amount, presentId } = req.body;
-
+    const { title, amount, presentId } = req.body || {};
     if (!title || !amount || !presentId) {
       return res.status(400).json({ error: "Campos obrigatórios ausentes." });
     }
@@ -86,99 +104,128 @@ app.post("/create_payment", async (req, res) => {
       metadata: { presentId },
     };
 
-    const result = await payment.create({ body });
+    const result = await mpPayment.create({ body });
     const qrData = result.point_of_interaction?.transaction_data;
 
-    if (!qrData) throw new Error("Dados de QRCode ausentes na resposta do Mercado Pago");
+    if (!qrData) {
+      console.error("❌ Resposta do MP sem transaction_data:", result);
+      return res.status(500).json({ error: "Resposta inválida do Mercado Pago" });
+    }
 
     const mp_id = String(result.id);
 
-    // Salva o pagamento no Firestore com mp_id como chave de referência
+    // 1) registra em payments/{mp_id}
     await db.collection("payments").doc(mp_id).set({
       presentId,
       title,
-      amount,
+      amount: Number(amount),
       status: "pending",
+      mp_id,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      qr_code: qrData.qr_code || null,
     });
 
-    // Atualiza o presente com o mp_id
-    const presentRef = db.collection("presents").doc(presentId);
-    await presentRef.update({
-      "payment.status": "pending",
-      "payment.mp_id": mp_id,
-    });
+    // 2) registra na subcoleção do produto: presents/{presentId}/transactions/{mp_id}
+    await db
+      .collection("presents")
+      .doc(presentId)
+      .collection("transactions")
+      .doc(mp_id)
+      .set({
+        presentId,
+        title,
+        amount: Number(amount),
+        status: "pending",
+        mp_id,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        qr_code: qrData.qr_code || null,
+      });
 
-    res.status(200).json({
+    // Retorna para o frontend as infos necessárias
+    return res.status(200).json({
       mp_id,
       qr_code: qrData.qr_code,
       qr_base64: qrData.qr_code_base64,
     });
   } catch (error) {
     console.error("❌ Erro ao criar pagamento:", error);
-    res.status(500).json({ error: "Erro ao criar pagamento" });
+    return res.status(500).json({ error: "Erro ao criar pagamento" });
   }
 });
 
-// 🔔 Webhook Mercado Pago
+// ==== Webhook Mercado Pago ====
+// Atualiza payments/{mp_id} e presents/{presentId}/transactions/{mp_id}
 app.post("/webhook", async (req, res) => {
   try {
     console.log("📬 Webhook recebido:", JSON.stringify(req.body));
 
-    const paymentId = String(req.body?.data?.id);
-    if (!paymentId) return res.sendStatus(400);
+    const paymentId = String(req.body?.data?.id || req.body?.data?.id?.toString?.());
+    if (!paymentId) {
+      console.warn("Webhook sem payment id");
+      return res.sendStatus(400);
+    }
 
-    const response = await payment.get({ id: paymentId });
+    // Buscar detalhado no Mercado Pago para pegar status e metadata
+    const response = await mpPayment.get({ id: paymentId });
     const { status, metadata } = response;
+    console.log(`🔎 Pagamento ${paymentId} status: ${status}`);
 
-    let presentId = metadata?.presentId || null;
-
-    // 🔍 Atualiza o documento do pagamento (centro da sincronização)
+    // Atualiza payments/{mp_id}
     const paymentRef = db.collection("payments").doc(paymentId);
     await paymentRef.set(
       {
         status,
+        rawResponse: response,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       },
       { merge: true }
     );
 
-    // 🔗 Atualiza o presente vinculado
+    // Discover presentId: tenta metadata, senão busca payments doc
+    let presentId = metadata?.presentId;
     if (!presentId) {
-      const snapshot = await db
-        .collection("payments")
-        .doc(paymentId)
-        .get();
-      presentId = snapshot.data()?.presentId || null;
+      const paySnap = await paymentRef.get();
+      presentId = paySnap.exists ? paySnap.data()?.presentId : null;
     }
 
-    if (presentId) {
-      const presentRef = db.collection("presents").doc(presentId);
-      await presentRef.update({
-        "payment.status":
+    if (!presentId) {
+      console.warn(`⚠️ Nenhum presentId vinculado ao pagamento ${paymentId}`);
+      return res.sendStatus(200);
+    }
+
+    // Atualiza presents/{presentId}/transactions/{mp_id}
+    const transRef = db
+      .collection("presents")
+      .doc(presentId)
+      .collection("transactions")
+      .doc(paymentId);
+
+    await transRef.set(
+      {
+        status:
           status === "approved"
             ? "paid"
             : ["cancelled", "rejected", "expired"].includes(status)
             ? "cancelled"
             : status,
-        "payment.updatedAt": admin.firestore.FieldValue.serverTimestamp(),
-      });
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        mp_status: status,
+      },
+      { merge: true }
+    );
 
-      console.log(`🪙 Pagamento ${paymentId} (${status}) vinculado ao presente ${presentId}`);
-    } else {
-      console.warn(`⚠️ Nenhum presente vinculado ao pagamento ${paymentId}`);
-    }
+    console.log(`✅ Pagamento ${paymentId} (${status}) vinculado ao presente ${presentId}`);
 
-    res.sendStatus(200);
-  } catch (error) {
-    console.error("❌ Erro no webhook:", error);
-    res.sendStatus(500);
+    return res.sendStatus(200);
+  } catch (err) {
+    console.error("❌ Erro no webhook:", err);
+    return res.sendStatus(500);
   }
 });
 
-// 🚀 Start
+// ==== Start server ====
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-  console.log(`🚀 Servidor rodando na porta ${PORT}`);
+  console.log(`🚀 Servidor rodando na porta ${PORT} (modo produção)`);
 });
