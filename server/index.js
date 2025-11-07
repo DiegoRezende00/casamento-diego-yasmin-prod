@@ -12,25 +12,32 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 
-// 🌐 CORS - só permite o domínio da Vercel e localhost
+// 🌐 CORS — permite apenas o domínio de produção e localhost
 const allowedOrigins = [
   "https://casamento-diego-yasmin.vercel.app",
   "http://localhost:5173",
 ];
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) callback(null, true);
-      else callback(new Error("CORS não permitido"));
+      // Permite requests sem origin (como em ferramentas internas ou backend)
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        console.warn(`🚫 Bloqueado por CORS: ${origin}`);
+        callback(null, false);
+      }
     },
+    credentials: true,
   })
 );
 
-// 🧩 Caminhos
+// 🧩 Caminhos utilitários
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// 🔥 Firebase config
+// 🔥 Firebase config (Render + local)
 let serviceAccount;
 try {
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
@@ -62,7 +69,7 @@ const payment = new Payment(client);
 
 // 🏠 Health check
 app.get("/", (req, res) => {
-  res.send("Servidor do casamento Diego & Yasmin está rodando 💍");
+  res.send("💍 Servidor do Casamento Diego & Yasmin está rodando com sucesso!");
 });
 
 // 💸 Criar pagamento PIX
@@ -84,7 +91,7 @@ app.post("/create_payment", async (req, res) => {
 
     const result = await payment.create({ body });
 
-    // 🔹 Atualiza o Firestore imediatamente para status "pending"
+    // Atualiza Firestore: status "pending"
     const presentRef = db.collection("presents").doc(presentId);
     await presentRef.update({
       "payment.status": "pending",
@@ -98,25 +105,26 @@ app.post("/create_payment", async (req, res) => {
       qr_base64: result.point_of_interaction.transaction_data.qr_code_base64,
     });
   } catch (error) {
-    console.error("❌ Erro ao criar pagamento:", error.message);
+    console.error("❌ Erro ao criar pagamento:", error);
     res.status(500).json({ error: "Erro ao criar pagamento" });
   }
 });
 
 // 🔔 Webhook Mercado Pago
 app.post("/webhook", async (req, res) => {
-  console.log("📬 Webhook recebido:", req.body);
   try {
+    console.log("📬 Webhook recebido:", req.body);
+
     const paymentId = req.body?.data?.id;
     if (!paymentId) return res.sendStatus(400);
 
-    // Consulta detalhada
+    // Consulta detalhada no Mercado Pago
     const response = await payment.get({ id: paymentId });
     const { status, metadata } = response;
 
     console.log(`🔎 Pagamento ${paymentId} status: ${status}`);
 
-    // Caso o metadata não venha, buscar o presentId via Firestore
+    // Busca o presentId
     let presentId = metadata?.presentId;
     if (!presentId) {
       const snapshot = await db
@@ -124,7 +132,6 @@ app.post("/webhook", async (req, res) => {
         .where("payment.mp_id", "==", paymentId)
         .limit(1)
         .get();
-
       if (!snapshot.empty) {
         presentId = snapshot.docs[0].id;
       }
@@ -137,30 +144,28 @@ app.post("/webhook", async (req, res) => {
 
     const presentRef = db.collection("presents").doc(presentId);
 
-    // Atualiza status de acordo com o retorno do MP
+    // Atualiza Firestore conforme status do pagamento
+    const updateData = {
+      "payment.status":
+        status === "approved"
+          ? "paid"
+          : ["cancelled", "rejected", "expired"].includes(status)
+          ? "cancelled"
+          : status,
+      "payment.updatedAt": admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    await presentRef.update(updateData);
+
     if (status === "approved") {
-      await presentRef.update({
-        "payment.status": "paid",
-        "payment.updatedAt": admin.firestore.FieldValue.serverTimestamp(),
-      });
       console.log(`🎉 Presente ${presentId} marcado como pago ✅`);
-    } else if (["cancelled", "rejected", "expired"].includes(status)) {
-      await presentRef.update({
-        "payment.status": "cancelled",
-        "payment.updatedAt": admin.firestore.FieldValue.serverTimestamp(),
-      });
-      console.log(`⚠️ Pagamento ${paymentId} cancelado/rejeitado ❌`);
     } else {
-      await presentRef.update({
-        "payment.status": status,
-        "payment.updatedAt": admin.firestore.FieldValue.serverTimestamp(),
-      });
       console.log(`ℹ️ Pagamento ${paymentId} atualizado para ${status}`);
     }
 
     res.sendStatus(200);
   } catch (error) {
-    console.error("❌ Erro no webhook:", error.message);
+    console.error("❌ Erro no webhook:", error);
     res.sendStatus(500);
   }
 });
