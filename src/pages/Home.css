@@ -1,163 +1,176 @@
-/* Layout base com padding lateral global */
-.container {
-  width: 100%;
-  max-width: 1100px;
-  padding: 0 20px;
-  margin: auto;
-}
+@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&display=swap");
 
-/* Fundo */
 .home-background {
-  min-height: 100vh;
   background-size: cover;
   background-position: center;
+  background-repeat: no-repeat;
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  flex-direction: column;
 }
 
 .overlay {
-  width: 100%;
+  background-color: rgba(255, 255, 255, 0.8);
   min-height: 100vh;
-  background: rgba(0,0,0,0.4);
-  padding-bottom: 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-bottom: 4rem;
 }
 
-/* SAVE THE DATE */
 .save-date-section {
   text-align: center;
-  padding-top: 60px;
-  padding-bottom: 40px;
+  margin-top: 5rem;
+  margin-bottom: 2rem;
 }
 
 .save-date-text {
-  font-size: 1.4rem;
-  color: #fff;
-  font-weight: 300;
+  font-size: 1.6rem;
+  color: #3d704b;
+  font-family: "Playfair Display", serif;
+  font-style: italic;
+  margin-bottom: 0.5rem;
 }
 
 .nomes {
-  font-size: 3rem;
-  color: #fff;
-  margin-top: 10px;
+  font-size: 2.8rem;
+  color: #2e5c3e;
+  margin-bottom: 0.5rem;
 }
 
 .contador {
-  font-size: 1.1rem;
-  color: #fff;
-  margin-top: 10px;
+  font-size: 1rem;
+  color: #333;
+  font-weight: 400;
 }
 
-/* EVENTO */
+/* --- Seção do evento --- */
 .evento-section {
   text-align: center;
-  color: #fff;
-  margin-top: 40px;
+  background-color: #f5f8f6;
+  border: 1px solid #e5e5e5;
+  margin: 2rem auto;
+  padding: 2rem;
+  max-width: 900px;
+  border-radius: 12px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
 }
 
 .evento-subtitulo {
-  font-size: 1.2rem;
-  opacity: 0.8;
+  color: #4a7856;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
 }
 
 .evento-titulo {
-  font-size: 2rem;
-  margin-top: 5px;
+  font-size: 1.8rem;
+  margin: 0.5rem 0 1.5rem 0;
+  color: #2e5c3e;
 }
 
-.evento-info p {
-  margin: 8px 0;
+.evento-info {
   font-size: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.emoji {
+  margin-right: 8px;
 }
 
 .botao-ver-evento {
-  background: #ffffff;
-  color: #000;
-  padding: 12px 22px;
-  border-radius: 8px;
-  margin-top: 20px;
-  cursor: pointer;
+  background-color: #eaf2ec;
   border: none;
-  font-size: 1rem;
+  color: #2e5c3e;
+  font-weight: 600;
+  padding: 0.8rem 2rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-family: "Playfair Display", serif;
 }
 
-/* PRESENTES */
+.botao-ver-evento:hover {
+  background-color: #d5e8da;
+}
+
+/* --- Seção dos presentes --- */
 .presentes-section {
-  margin-top: 60px;
+  display: flex;
+  justify-content: center;
+  margin: 4rem 0;
 }
 
 .presentes-conteudo {
   display: flex;
   align-items: center;
-  gap: 40px;
+  background-color: #f5f8f6;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  max-width: 900px;
+  flex-wrap: wrap;
+}
+
+.presentes-imagem img {
+  width: 100%;
+  max-width: 420px;
+  height: auto;
+  display: block;
+}
+
+.presentes-texto {
+  padding: 2rem;
+  flex: 1;
+  min-width: 300px;
 }
 
 .presentes-texto h2 {
-  font-size: 2rem;
-  margin-bottom: 10px;
+  color: #2e5c3e;
+  font-size: 1.6rem;
+  margin-bottom: 1rem;
 }
 
 .presentes-texto p {
-  font-size: 1.05rem;
-  margin-bottom: 15px;
+  color: #555;
+  font-size: 1rem;
+  line-height: 1.6;
+  margin-bottom: 2rem;
 }
 
 .botao-presentear {
-  padding: 12px 22px;
-  background: #2e7d32;
-  color: white;
+  background-color: #2e5c3e;
+  color: #fff;
   border: none;
+  padding: 0.8rem 1.8rem;
   border-radius: 8px;
   cursor: pointer;
+  font-family: "Playfair Display", serif;
+  font-weight: 600;
+  transition: all 0.3s;
 }
 
-/* IMAGEM */
-.presentes-imagem img {
-  width: 300px;
-  border-radius: 14px;
-  box-shadow: 0 6px 18px rgba(0,0,0,0.2);
+.botao-presentear:hover {
+  background-color: #3d704b;
 }
 
-/* ======= RESPONSIVIDADE ======= */
+/* --- Responsividade --- */
+@media (max-width: 768px) {
+  .save-date-text {
+    font-size: 1.4rem;
+  }
 
-@media (max-width: 900px) {
+  .nomes {
+    font-size: 2.2rem;
+  }
+
   .presentes-conteudo {
     flex-direction: column;
-    text-align: center;
   }
 
   .presentes-imagem img {
-    width: 220px;
-  }
-
-  .nomes {
-    font-size: 2.3rem;
-  }
-
-  .evento-titulo {
-    font-size: 1.6rem;
-  }
-}
-
-@media (max-width: 600px) {
-  .save-date-text {
-    font-size: 1.1rem;
-  }
-
-  .nomes {
-    font-size: 2rem;
-  }
-
-  .contador {
-    font-size: 0.95rem;
-  }
-
-  .presentes-texto h2 {
-    font-size: 1.6rem;
-  }
-
-  .presentes-texto p {
-    font-size: 1rem;
-  }
-
-  .presentes-imagem img {
-    width: 180px;
+    max-width: 100%;
   }
 }
