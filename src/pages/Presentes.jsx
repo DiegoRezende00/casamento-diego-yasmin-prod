@@ -12,11 +12,13 @@ import axios from "axios";
 
 export default function Presentes() {
   const [presentes, setPresentes] = useState([]);
+  const [funPresents, setFunPresents] = useState([]); // 🔹 NOVO BLOCO
   const [loadingId, setLoadingId] = useState(null);
   const [qrCode, setQrCode] = useState(null);
   const [selectedGift, setSelectedGift] = useState(null);
   const [copyCode, setCopyCode] = useState("");
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
+  const [sortOption, setSortOption] = useState("az");
   const transUnsubRef = useRef(null);
 
   useEffect(() => {
@@ -27,6 +29,36 @@ export default function Presentes() {
     return () => unsub();
   }, []);
 
+  // 🔹 NOVA COLEÇÃO - LISTA DIVERTIDA
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "funPresents"), (snapshot) => {
+      const lista = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setFunPresents(lista);
+    });
+    return () => unsub();
+  }, []);
+
+  // 🔹 Ordenação
+  const ordenarPresentes = (lista) => {
+    const sorted = [...lista];
+
+    switch (sortOption) {
+      case "menor":
+        sorted.sort((a, b) => Number(a.preco) - Number(b.preco));
+        break;
+      case "maior":
+        sorted.sort((a, b) => Number(b.preco) - Number(a.preco));
+        break;
+      case "za":
+        sorted.sort((a, b) => b.nome.localeCompare(a.nome));
+        break;
+      default:
+        sorted.sort((a, b) => a.nome.localeCompare(b.nome));
+    }
+
+    return sorted;
+  };
+
   const reservar = async (p) => {
     const confirm = window.confirm(
       `Deseja presentear "${p.nome}" por R$ ${Number(p.preco).toFixed(2)}?`
@@ -34,20 +66,17 @@ export default function Presentes() {
     if (!confirm) return;
 
     try {
-      // Cancela listener antigo
       if (transUnsubRef.current) {
-        try { transUnsubRef.current(); } catch(e){}
+        try { transUnsubRef.current(); } catch (e) {}
         transUnsubRef.current = null;
       }
 
-      // Limpa estados antigos
       setLoadingId(p.id);
       setQrCode(null);
       setCopyCode("");
       setSelectedGift(p);
       setPaymentConfirmed(false);
 
-      // Cria pagamento via backend
       const { data } = await axios.post(
         `${import.meta.env.VITE_API_URL}/create_payment`,
         { title: p.nome, amount: p.preco, presentId: p.id },
@@ -60,11 +89,9 @@ export default function Presentes() {
         return;
       }
 
-      // Mostra QR code
       if (data.qr_base64) setQrCode(`data:image/png;base64,${data.qr_base64}`);
       if (data.qr_code) setCopyCode(data.qr_code);
 
-      // Atualiza último paymentId no presente (somente referência)
       try {
         const presentRef = doc(db, "presents", p.id);
         await updateDoc(presentRef, {
@@ -75,7 +102,6 @@ export default function Presentes() {
         console.warn("⚠️ Não foi possível atualizar present.lastMp", e);
       }
 
-      // 🔹 Escuta apenas a transação recém-criada na subcoleção transactions
       const transRef = doc(db, "presents", p.id, "transactions", paymentId);
       const unsubTrans = onDocSnapshot(transRef, (snap) => {
         if (!snap.exists()) return;
@@ -91,20 +117,19 @@ export default function Presentes() {
             setSelectedGift(null);
           }, 8000);
 
-          try { unsubTrans(); } catch(e){}
+          try { unsubTrans(); } catch (e) {}
           transUnsubRef.current = null;
         } else if (["cancelled", "rejected", "expired"].includes(tx.status)) {
           setQrCode(null);
           setSelectedGift(null);
           setCopyCode("");
           alert("Pagamento cancelado ou expirado. Tente novamente.");
-          try { unsubTrans(); } catch(e){}
-          transUnsubRefRef.current = null;
+          try { unsubTrans(); } catch (e) {}
+          transUnsubRef.current = null;
         }
       });
 
       transUnsubRef.current = unsubTrans;
-
     } catch (err) {
       console.error("❌ Erro ao criar pagamento:", err.response || err);
       alert("Erro ao iniciar o pagamento. Verifique o console.");
@@ -123,19 +148,67 @@ export default function Presentes() {
 
   return (
     <div style={{ padding: "2rem", backgroundColor: "#f5f5f5", minHeight: "100vh" }}>
-      <h2 style={{ textAlign: "center", color: "#2e7d32", fontSize: 28 }}>
-        🎁 Lista de Presentes
+
+      {/* 🔹 Banner topo */}
+      <div
+        style={{
+          backgroundImage: "url('https://png.pngtree.com/png-vector/20241205/ourlarge/pngtree-purple-present-with-bow-a-unique-gift-for-the-holidays-png-image_14604272.png')",
+          backgroundSize: "120px",
+          backgroundRepeat: "no-repeat",
+          backgroundPosition: "center 20px",
+          padding: "150px 20px 40px 20px",
+          textAlign: "center",
+          backgroundColor: "#fff",
+          borderRadius: 12,
+          boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+          marginBottom: "2rem",
+        }}
+      >
+        <h2 style={{ color: "#2e7d32", fontSize: 26 }}>
+          Esta é a nossa lista de presentes e um de nossos grandes sonhos como casal.
+        </h2>
+        <p style={{ marginTop: 10, fontSize: 16, color: "#444" }}>
+          Ficamos muito felizes em compartilhar com vocês esse momento tão especial cheio de amor ❤️
+        </p>
+      </div>
+
+      {/* ============================
+          🔹 BLOCO CASA COMPLETA
+      ============================== */}
+      <h2 style={{ color: "#2e7d32", marginBottom: 20, textAlign: "center" }}>
+        🏡 CASA COMPLETA
       </h2>
 
+      {/* 🔹 Filtros */}
+      <div style={{ textAlign: "center", marginBottom: "1rem" }}>
+        <select
+          value={sortOption}
+          onChange={(e) => setSortOption(e.target.value)}
+          style={{
+            padding: "10px",
+            borderRadius: 8,
+            border: "1px solid #2e7d32",
+            fontSize: 16,
+            cursor: "pointer",
+          }}
+        >
+          <option value="az">Ordenar: A → Z</option>
+          <option value="za">Ordenar: Z → A</option>
+          <option value="menor">Menor valor</option>
+          <option value="maior">Maior valor</option>
+        </select>
+      </div>
+
+      {/* 🎁 Lista CASA COMPLETA */}
       <div
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
           gap: "1.5rem",
-          marginTop: "2rem",
+          marginTop: "1rem",
         }}
       >
-        {presentes.map((p) => (
+        {ordenarPresentes(presentes).map((p) => (
           <div
             key={p.id}
             style={{
@@ -196,7 +269,100 @@ export default function Presentes() {
         ))}
       </div>
 
-      {/* 🔹 Modal Pix / Pagamento */}
+      {/* ============================
+          🎉 BLOCO LISTA DIVERTIDA
+      ============================== */}
+      <h2
+        style={{
+          color: "#8e24aa",
+          marginTop: "3rem",
+          marginBottom: "1rem",
+          textAlign: "center",
+        }}
+      >
+        🎉 LISTA DIVERTIDA
+      </h2>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
+          gap: "1.5rem",
+          marginBottom: "2rem",
+        }}
+      >
+        {funPresents.length === 0 ? (
+          <p style={{ textAlign: "center", width: "100%" }}>
+            Nenhum item divertido ainda 😄
+          </p>
+        ) : (
+          ordenarPresentes(funPresents).map((p) => (
+            <div
+              key={p.id}
+              style={{
+                backgroundColor: "white",
+                padding: "1rem",
+                borderRadius: "10px",
+                boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
+                textAlign: "center",
+              }}
+            >
+              {p.imagemUrl && (
+                <div
+                  style={{
+                    width: "100%",
+                    height: "220px",
+                    backgroundColor: "#fafafa",
+                    borderRadius: "8px",
+                    overflow: "hidden",
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    marginBottom: "10px",
+                  }}
+                >
+                  <img
+                    src={p.imagemUrl}
+                    alt={p.nome}
+                    style={{
+                      maxWidth: "100%",
+                      maxHeight: "100%",
+                      objectFit: "contain",
+                    }}
+                  />
+                </div>
+              )}
+
+              <h3 style={{ color: "#8e24aa", marginBottom: "0.5rem" }}>
+                {p.nome}
+              </h3>
+              <p>
+                <strong>Valor:</strong> R$ {Number(p.preco).toFixed(2)}
+              </p>
+
+              <button
+                onClick={() => reservar(p)}
+                disabled={loadingId === p.id}
+                style={{
+                  backgroundColor: "#8e24aa",
+                  color: "#fff",
+                  padding: "10px 15px",
+                  borderRadius: 8,
+                  marginTop: "10px",
+                  cursor: "pointer",
+                  opacity: loadingId === p.id ? 0.7 : 1,
+                }}
+              >
+                {loadingId === p.id ? "Gerando..." : "Presentear 🎁"}
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* ============================
+          🔹 Modal Pix
+      ============================== */}
       {(qrCode || paymentConfirmed) && selectedGift && (
         <div
           style={{
@@ -221,8 +387,6 @@ export default function Presentes() {
               boxShadow: "0 8px 20px rgba(0,0,0,0.3)",
               maxWidth: "400px",
               width: "90%",
-              transition: "all 0.3s ease",
-              animation: "fadeIn 0.5s ease",
             }}
           >
             {paymentConfirmed ? (
