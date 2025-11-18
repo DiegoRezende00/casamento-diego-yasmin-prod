@@ -12,7 +12,7 @@ import axios from "axios";
 
 export default function Presentes() {
   const [presentes, setPresentes] = useState([]);
-  const [funPresents, setFunPresents] = useState([]); // 🔹 NOVO BLOCO
+  const [funPresents, setFunPresents] = useState([]);
   const [loadingId, setLoadingId] = useState(null);
   const [qrCode, setQrCode] = useState(null);
   const [selectedGift, setSelectedGift] = useState(null);
@@ -29,7 +29,6 @@ export default function Presentes() {
     return () => unsub();
   }, []);
 
-  // 🔹 NOVA COLEÇÃO - LISTA DIVERTIDA
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "funPresents"), (snapshot) => {
       const lista = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -38,7 +37,6 @@ export default function Presentes() {
     return () => unsub();
   }, []);
 
-  // 🔹 Ordenação
   const ordenarPresentes = (lista) => {
     const sorted = [...lista];
 
@@ -67,7 +65,9 @@ export default function Presentes() {
 
     try {
       if (transUnsubRef.current) {
-        try { transUnsubRef.current(); } catch (e) {}
+        try {
+          transUnsubRef.current();
+        } catch (e) {}
         transUnsubRef.current = null;
       }
 
@@ -117,14 +117,18 @@ export default function Presentes() {
             setSelectedGift(null);
           }, 8000);
 
-          try { unsubTrans(); } catch (e) {}
+          try {
+            unsubTrans();
+          } catch (e) {}
           transUnsubRef.current = null;
         } else if (["cancelled", "rejected", "expired"].includes(tx.status)) {
           setQrCode(null);
           setSelectedGift(null);
           setCopyCode("");
           alert("Pagamento cancelado ou expirado. Tente novamente.");
-          try { unsubTrans(); } catch (e) {}
+          try {
+            unsubTrans();
+          } catch (e) {}
           transUnsubRef.current = null;
         }
       });
@@ -147,156 +151,65 @@ export default function Presentes() {
   };
 
   return (
-    <div style={{ padding: "2rem", backgroundColor: "#f5f5f5", minHeight: "100vh" }}>
+    <div style={{ backgroundColor: "#f5f5f5", minHeight: "100vh" }}>
+      {/* 🔹 Banner topo estilo Wedy */}
+      <div className="relative h-[400px] w-full mb-10">
+        <div className="absolute inset-0 overflow-hidden rounded-none">
+          <img
+            alt="Banner"
+            className="h-full w-full object-cover"
+            src="https://images.wedy.com/eyJidWNrZXQiOiJ3ZWR5LW5leHQiLCJrZXkiOiIyMDIyLzAyLzIzL3dlZHktdjEtcnJwVVZUTmV3TUhIUUVObVJDZlBrLW1vY2t1cF9naWZ0X3JlZ2lzdHJ5X3B1cnBsZS5wbmciLCJlZGl0cyI6eyJyb3RhdGUiOm51bGwsInJlc2l6ZSI6eyJ3aWR0aCI6MTkyMCwiZml0IjoiY292ZXIifX19"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/80 to-black/0"></div>
+        </div>
 
-      {/* 🔹 Banner topo */}
-      <div
-        style={{
-          backgroundImage: "url('https://png.pngtree.com/png-vector/20241205/ourlarge/pngtree-purple-present-with-bow-a-unique-gift-for-the-holidays-png-image_14604272.png')",
-          backgroundSize: "120px",
-          backgroundRepeat: "no-repeat",
-          backgroundPosition: "center 20px",
-          padding: "150px 20px 40px 20px",
-          textAlign: "center",
-          backgroundColor: "#fff",
-          borderRadius: 12,
-          boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-          marginBottom: "2rem",
-        }}
-      >
-        <h2 style={{ color: "#2e7d32", fontSize: 26 }}>
-          Esta é a nossa lista de presentes e um de nossos grandes sonhos como casal.
+        {/* Texto sobreposto */}
+        <div className="absolute inset-0 flex flex-col justify-center space-y-4 pl-12 md:w-1/2">
+          <div className="text-[32px] md:text-[40px] text-white font-bold leading-tight">
+            Lista de presentes
+          </div>
+          <div className="text-[14px] md:text-[16px] text-white leading-normal">
+            Esta é a nossa lista de presentes e um de nossos grandes sonhos como casal.
+            Ficamos muito felizes em compartilhar esse momento tão especial cheio de amor.
+          </div>
+        </div>
+      </div>
+
+      <div style={{ padding: "2rem" }}>
+        {/* CASA COMPLETA */}
+        <h2 style={{ color: "#2e7d32", marginBottom: 20, textAlign: "center" }}>
+          🏡 CASA COMPLETA
         </h2>
-        <p style={{ marginTop: 10, fontSize: 16, color: "#444" }}>
-          Ficamos muito felizes em compartilhar com vocês esse momento tão especial cheio de amor ❤️
-        </p>
-      </div>
 
-      {/* ============================
-          🔹 BLOCO CASA COMPLETA
-      ============================== */}
-      <h2 style={{ color: "#2e7d32", marginBottom: 20, textAlign: "center" }}>
-        🏡 CASA COMPLETA
-      </h2>
-
-      {/* 🔹 Filtros */}
-      <div style={{ textAlign: "center", marginBottom: "1rem" }}>
-        <select
-          value={sortOption}
-          onChange={(e) => setSortOption(e.target.value)}
-          style={{
-            padding: "10px",
-            borderRadius: 8,
-            border: "1px solid #2e7d32",
-            fontSize: 16,
-            cursor: "pointer",
-          }}
-        >
-          <option value="az">Ordenar: A → Z</option>
-          <option value="za">Ordenar: Z → A</option>
-          <option value="menor">Menor valor</option>
-          <option value="maior">Maior valor</option>
-        </select>
-      </div>
-
-      {/* 🎁 Lista CASA COMPLETA */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
-          gap: "1.5rem",
-          marginTop: "1rem",
-        }}
-      >
-        {ordenarPresentes(presentes).map((p) => (
-          <div
-            key={p.id}
+        {/* Filtro */}
+        <div style={{ textAlign: "center", marginBottom: "1rem" }}>
+          <select
+            value={sortOption}
+            onChange={(e) => setSortOption(e.target.value)}
             style={{
-              backgroundColor: "white",
-              padding: "1rem",
-              borderRadius: "10px",
-              boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
-              textAlign: "center",
+              padding: "10px",
+              borderRadius: 8,
+              border: "1px solid #2e7d32",
+              fontSize: 16,
+              cursor: "pointer",
             }}
           >
-            {p.imagemUrl && (
-              <div
-                style={{
-                  width: "100%",
-                  height: "220px",
-                  backgroundColor: "#fafafa",
-                  borderRadius: "8px",
-                  overflow: "hidden",
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  marginBottom: "10px",
-                }}
-              >
-                <img
-                  src={p.imagemUrl}
-                  alt={p.nome}
-                  style={{
-                    maxWidth: "100%",
-                    maxHeight: "100%",
-                    objectFit: "contain",
-                  }}
-                />
-              </div>
-            )}
+            <option value="az">Ordenar: A → Z</option>
+            <option value="za">Ordenar: Z → A</option>
+            <option value="menor">Menor valor</option>
+            <option value="maior">Maior valor</option>
+          </select>
+        </div>
 
-            <h3 style={{ color: "#2e7d32", marginBottom: "0.5rem" }}>{p.nome}</h3>
-            <p>
-              <strong>Valor:</strong> R$ {Number(p.preco).toFixed(2)}
-            </p>
-
-            <button
-              onClick={() => reservar(p)}
-              disabled={loadingId === p.id}
-              style={{
-                backgroundColor: "#2e7d32",
-                color: "#fff",
-                padding: "10px 15px",
-                borderRadius: 8,
-                marginTop: "10px",
-                cursor: "pointer",
-                opacity: loadingId === p.id ? 0.7 : 1,
-              }}
-            >
-              {loadingId === p.id ? "Gerando..." : "Presentear 🎁"}
-            </button>
-          </div>
-        ))}
-      </div>
-
-      {/* ============================
-          🎉 BLOCO LISTA DIVERTIDA
-      ============================== */}
-      <h2
-        style={{
-          color: "#8e24aa",
-          marginTop: "3rem",
-          marginBottom: "1rem",
-          textAlign: "center",
-        }}
-      >
-        🎉 LISTA DIVERTIDA
-      </h2>
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
-          gap: "1.5rem",
-          marginBottom: "2rem",
-        }}
-      >
-        {funPresents.length === 0 ? (
-          <p style={{ textAlign: "center", width: "100%" }}>
-            Nenhum item divertido ainda 😄
-          </p>
-        ) : (
-          ordenarPresentes(funPresents).map((p) => (
+        {/* Lista CASA COMPLETA */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
+            gap: "1.5rem",
+          }}
+        >
+          {ordenarPresentes(presentes).map((p) => (
             <div
               key={p.id}
               style={{
@@ -324,27 +237,19 @@ export default function Presentes() {
                   <img
                     src={p.imagemUrl}
                     alt={p.nome}
-                    style={{
-                      maxWidth: "100%",
-                      maxHeight: "100%",
-                      objectFit: "contain",
-                    }}
+                    style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
                   />
                 </div>
               )}
 
-              <h3 style={{ color: "#8e24aa", marginBottom: "0.5rem" }}>
-                {p.nome}
-              </h3>
-              <p>
-                <strong>Valor:</strong> R$ {Number(p.preco).toFixed(2)}
-              </p>
+              <h3 style={{ color: "#2e7d32", marginBottom: "0.5rem" }}>{p.nome}</h3>
+              <p><strong>Valor:</strong> R$ {Number(p.preco).toFixed(2)}</p>
 
               <button
                 onClick={() => reservar(p)}
                 disabled={loadingId === p.id}
                 style={{
-                  backgroundColor: "#8e24aa",
+                  backgroundColor: "#2e7d32",
                   color: "#fff",
                   padding: "10px 15px",
                   borderRadius: 8,
@@ -356,112 +261,191 @@ export default function Presentes() {
                 {loadingId === p.id ? "Gerando..." : "Presentear 🎁"}
               </button>
             </div>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
 
-      {/* ============================
-          🔹 Modal Pix
-      ============================== */}
-      {(qrCode || paymentConfirmed) && selectedGift && (
-        <div
+        {/* LISTA DIVERTIDA */}
+        <h2
           style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100vw",
-            height: "100vh",
-            backgroundColor: "rgba(0,0,0,0.6)",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: 1000,
+            color: "#8e24aa",
+            marginTop: "3rem",
+            marginBottom: "1rem",
+            textAlign: "center",
           }}
         >
-          <div
-            style={{
-              backgroundColor: "#fff",
-              padding: "2rem",
-              borderRadius: "12px",
-              textAlign: "center",
-              boxShadow: "0 8px 20px rgba(0,0,0,0.3)",
-              maxWidth: "400px",
-              width: "90%",
-            }}
-          >
-            {paymentConfirmed ? (
+          🎉 LISTA DIVERTIDA
+        </h2>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
+            gap: "1.5rem",
+            marginBottom: "2rem",
+          }}
+        >
+          {funPresents.length === 0 ? (
+            <p style={{ textAlign: "center", width: "100%" }}>
+              Nenhum item divertido ainda 😄
+            </p>
+          ) : (
+            ordenarPresentes(funPresents).map((p) => (
               <div
+                key={p.id}
                 style={{
-                  color: "#2e7d32",
-                  fontSize: "1.8rem",
-                  fontWeight: "bold",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  minHeight: "250px",
+                  backgroundColor: "white",
+                  padding: "1rem",
+                  borderRadius: "10px",
+                  boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
+                  textAlign: "center",
                 }}
               >
-                ✅ Pagamento confirmado com sucesso!
-                <p style={{ fontSize: "1rem", marginTop: "1rem", color: "#4caf50" }}>
-                  Obrigado por presentear! ❤️
-                </p>
-              </div>
-            ) : (
-              <>
-                <h3 style={{ color: "#2e7d32" }}>Pagamento de {selectedGift.nome}</h3>
-
-                <img
-                  src={qrCode}
-                  alt="QR Code Pagamento"
-                  style={{
-                    marginTop: "1rem",
-                    width: "250px",
-                    height: "250px",
-                    borderRadius: "10px",
-                  }}
-                />
-
-                <p style={{ marginTop: "1rem" }}>
-                  Escaneie com o app do banco ou copie o código abaixo 👇
-                </p>
-
-                {copyCode && (
-                  <div style={{ marginTop: "1rem" }}>
-                    <input
-                      type="text"
-                      readOnly
-                      value={copyCode}
-                      style={{
-                        width: "100%",
-                        padding: "8px",
-                        borderRadius: 6,
-                        border: "1px solid #ccc",
-                        textAlign: "center",
-                        fontSize: "12px",
-                      }}
+                {p.imagemUrl && (
+                  <div
+                    style={{
+                      width: "100%",
+                      height: "220px",
+                      backgroundColor: "#fafafa",
+                      borderRadius: "8px",
+                      overflow: "hidden",
+                      display: "flex",
+                      justifyContent: "center",
+                      alignItems: "center",
+                      marginBottom: "10px",
+                    }}
+                  >
+                    <img
+                      src={p.imagemUrl}
+                      alt={p.nome}
+                      style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
                     />
-                    <button
-                      onClick={copiarQRCode}
-                      style={{
-                        marginTop: 8,
-                        backgroundColor: "#2e7d32",
-                        color: "#fff",
-                        padding: "6px 12px",
-                        borderRadius: 6,
-                        cursor: "pointer",
-                        fontSize: "14px",
-                      }}
-                    >
-                      Copiar código Pix
-                    </button>
                   </div>
                 )}
-              </>
-            )}
-          </div>
+
+                <h3 style={{ color: "#8e24aa", marginBottom: "0.5rem" }}>{p.nome}</h3>
+                <p><strong>Valor:</strong> R$ {Number(p.preco).toFixed(2)}</p>
+
+                <button
+                  onClick={() => reservar(p)}
+                  disabled={loadingId === p.id}
+                  style={{
+                    backgroundColor: "#8e24aa",
+                    color: "#fff",
+                    padding: "10px 15px",
+                    borderRadius: 8,
+                    marginTop: "10px",
+                    cursor: "pointer",
+                    opacity: loadingId === p.id ? 0.7 : 1,
+                  }}
+                >
+                  {loadingId === p.id ? "Gerando..." : "Presentear 🎁"}
+                </button>
+              </div>
+            ))
+          )}
         </div>
-      )}
+
+        {/* MODAL PIX */}
+        {(qrCode || paymentConfirmed) && selectedGift && (
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              width: "100vw",
+              height: "100vh",
+              backgroundColor: "rgba(0,0,0,0.6)",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              zIndex: 1000,
+            }}
+          >
+            <div
+              style={{
+                backgroundColor: "#fff",
+                padding: "2rem",
+                borderRadius: "12px",
+                textAlign: "center",
+                boxShadow: "0 8px 20px rgba(0,0,0,0.3)",
+                maxWidth: "400px",
+                width: "90%",
+              }}
+            >
+              {paymentConfirmed ? (
+                <div
+                  style={{
+                    color: "#2e7d32",
+                    fontSize: "1.8rem",
+                    fontWeight: "bold",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    minHeight: "250px",
+                  }}
+                >
+                  ✅ Pagamento confirmado com sucesso!
+                  <p style={{ fontSize: "1rem", marginTop: "1rem", color: "#4caf50" }}>
+                    Obrigado por presentear! ❤️
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <h3 style={{ color: "#2e7d32" }}>Pagamento de {selectedGift.nome}</h3>
+
+                  <img
+                    src={qrCode}
+                    alt="QR Code Pagamento"
+                    style={{
+                      marginTop: "1rem",
+                      width: "250px",
+                      height: "250px",
+                      borderRadius: "10px",
+                    }}
+                  />
+
+                  <p style={{ marginTop: "1rem" }}>
+                    Escaneie com o app do banco ou copie o código abaixo 👇
+                  </p>
+
+                  {copyCode && (
+                    <div style={{ marginTop: "1rem" }}>
+                      <input
+                        type="text"
+                        readOnly
+                        value={copyCode}
+                        style={{
+                          width: "100%",
+                          padding: "8px",
+                          borderRadius: 6,
+                          border: "1px solid #ccc",
+                          textAlign: "center",
+                          fontSize: "12px",
+                        }}
+                      />
+                      <button
+                        onClick={copiarQRCode}
+                        style={{
+                          marginTop: 8,
+                          backgroundColor: "#2e7d32",
+                          color: "#fff",
+                          padding: "6px 12px",
+                          borderRadius: 6,
+                          cursor: "pointer",
+                          fontSize: "14px",
+                        }}
+                      >
+                        Copiar código Pix
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
