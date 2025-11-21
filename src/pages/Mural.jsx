@@ -16,27 +16,30 @@ export default function Mural() {
   }, []);
 
   return (
-    <div className="mural-container">
-      <h2>Mural de Recados 💌</h2>
-      {recados.length === 0 ? (
-        <p>Seja o primeiro a deixar um recado para Diego & Yasmin!</p>
-      ) : (
-        <div className="recados-lista">
-          {recados.map((r, i) => (
-            <div className="recado" key={i}>
-              <h4>{r.nome}</h4>
-              <p>{r.mensagem}</p>
-              {r.email && <span>{r.email}</span>}
-            </div>
-          ))}
-        </div>
-      )}
+    <div className="page-wrapper">
+      <div className="mural-container">
+        <h2>Mural de Recados 💌</h2>
 
-      <button className="btn-adicionar" onClick={() => setModalOpen(true)}>
-        + Adicione seu recado
-      </button>
+        {recados.length === 0 ? (
+          <p>Seja o primeiro a deixar um recado para Diego & Yasmin!</p>
+        ) : (
+          <div className="recados-lista">
+            {recados.map((r, i) => (
+              <div className="recado" key={i}>
+                <h4>{r.nome}</h4>
+                <p>{r.mensagem}</p>
+                {r.email && <span>{r.email}</span>}
+              </div>
+            ))}
+          </div>
+        )}
 
-      {modalOpen && <ModalRecado onClose={() => setModalOpen(false)} />}
+        <button className="btn-adicionar" onClick={() => setModalOpen(true)}>
+          + Adicione seu recado
+        </button>
+
+        {modalOpen && <ModalRecado onClose={() => setModalOpen(false)} />}
+      </div>
     </div>
   );
 }
