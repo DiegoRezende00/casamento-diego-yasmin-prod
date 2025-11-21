@@ -1,8 +1,17 @@
+/* NOVO — garante margens laterais iguais ao restante do site */
+.page-wrapper {
+  width: 100%;
+  max-width: 1300px;
+  margin: 0 auto;
+  padding: 0 20px;
+  box-sizing: border-box;
+}
+
+/* Seu CSS original */
 .mural-container {
   text-align: center;
   padding: 2rem;
   color: #1b5e20;
-  background-color: #f9f9f9;
   min-height: 80vh;
 }
 

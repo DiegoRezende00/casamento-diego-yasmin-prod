@@ -177,3 +177,12 @@ body {
     /* Botão NÃO COMPARECEREI (VERMELHO) */
     background-color: #f44336; /* Vermelho */
 }
+
+/* NOVO — garante margens laterais iguais ao site */
+.page-wrapper {
+    width: 100%;
+    max-width: 1300px;
+    margin: 0 auto;
+    padding: 0 20px; /* margem lateral */
+    box-sizing: border-box;
+}

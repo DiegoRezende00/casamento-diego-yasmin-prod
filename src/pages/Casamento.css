@@ -3,13 +3,12 @@
 .casamento-container {
   text-align: center;
   padding: 40px 20px;
-  background-color: #fff8f0;
   color: #444;
 }
 
 .casamento-container h1 {
   font-size: 2.2rem;
-  color: #d87b5c;
+  color: #2e5939;
   margin-bottom: 24px;
 }
 
@@ -117,4 +116,13 @@
     width: 100%;
     font-size: 0.9rem;
   }
+}
+
+/* === NOVO: MARGENS LATERAIS PADRÃO DO SITE === */
+.page-wrapper {
+  width: 100%;
+  max-width: 1300px;
+  margin: 0 auto;
+  padding: 0 20px;
+  box-sizing: border-box;
 }
