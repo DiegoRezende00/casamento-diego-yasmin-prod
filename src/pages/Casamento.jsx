@@ -6,7 +6,7 @@ const Casamento = () => {
     "https://www.google.com/maps/place/Taquaral+Café/@-22.786206,-47.5894864,17z/data=!3m1!4b1!4m6!3m5!1s0x94c6256ed0a3e573:0xaab5a960bb7a8a29!8m2!3d-22.786211!4d-47.5846155!16s%2Fg%2F11kq6sqgt9";
 
   const googleCalendarLink =
-    "https://calendar.google.com/calendar/render?action=TEMPLATE&text=Casamento+Yasmin+e+Diego&dates=20260712T103000Z/20260712T2173000Z&details=Casamento+de+Yasmin+e+Diego&location=Espaço+Taquaral,+Piracicaba,+SP,+Brasil";
+    "https://calendar.google.com/calendar/render?action=TEMPLATE&text=Casamento+Yasmin+e+Diego&dates=20260711T103000Z/20260711T2173000Z&details=Casamento+de+Yasmin+e+Diego&location=Espaço+Taquaral,+Piracicaba,+SP,+Brasil";
 
   return (
     <div
