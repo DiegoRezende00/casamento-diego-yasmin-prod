@@ -46,7 +46,7 @@ const Casamento = () => {
           }}
         >
           <p>
-            <strong>Data:</strong> 20 de dezembro de 2025 — 16h30
+            <strong>Data:</strong> 11 de julho de 2026 — 15h30
           </p>
 
           <p>
