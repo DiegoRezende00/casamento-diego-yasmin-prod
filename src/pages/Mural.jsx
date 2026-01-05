@@ -32,11 +32,12 @@ export default function Mural() {
         </div>
       )}
 
-      <button className="btn-adicionar" onClick={() => setModalOpen(true)}>
-        + Adicione seu recado
-      </button>
+        <button className="btn-adicionar" onClick={() => setModalOpen(true)}>
+          + Adicione seu recado
+        </button>
 
-      {modalOpen && <ModalRecado onClose={() => setModalOpen(false)} />}
+        {modalOpen && <ModalRecado onClose={() => setModalOpen(false)} />}
+      </div>
     </div>
   );
 }

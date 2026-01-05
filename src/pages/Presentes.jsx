@@ -1,4 +1,7 @@
+// ⭐⭐ ARQUIVO COMPLETO ALTERADO ⭐⭐
+
 import React, { useEffect, useState, useRef } from "react";
+import presenteImg from "../assets/presente.jpg";
 import { db } from "../firebase";
 import {
   collection,
@@ -12,7 +15,7 @@ import axios from "axios";
 
 export default function Presentes() {
   const [presentes, setPresentes] = useState([]);
-  const [funPresents, setFunPresents] = useState([]); // 🔹 NOVO BLOCO
+  const [funPresents, setFunPresents] = useState([]);
   const [loadingId, setLoadingId] = useState(null);
   const [qrCode, setQrCode] = useState(null);
   const [selectedGift, setSelectedGift] = useState(null);
@@ -29,7 +32,6 @@ export default function Presentes() {
     return () => unsub();
   }, []);
 
-  // 🔹 NOVA COLEÇÃO - LISTA DIVERTIDA
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "funPresents"), (snapshot) => {
       const lista = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -38,7 +40,6 @@ export default function Presentes() {
     return () => unsub();
   }, []);
 
-  // 🔹 Ordenação
   const ordenarPresentes = (lista) => {
     const sorted = [...lista];
 
@@ -67,7 +68,9 @@ export default function Presentes() {
 
     try {
       if (transUnsubRef.current) {
-        try { transUnsubRef.current(); } catch (e) {}
+        try {
+          transUnsubRef.current();
+        } catch (e) {}
         transUnsubRef.current = null;
       }
 
@@ -117,14 +120,18 @@ export default function Presentes() {
             setSelectedGift(null);
           }, 8000);
 
-          try { unsubTrans(); } catch (e) {}
+          try {
+            unsubTrans();
+          } catch (e) {}
           transUnsubRef.current = null;
         } else if (["cancelled", "rejected", "expired"].includes(tx.status)) {
           setQrCode(null);
           setSelectedGift(null);
           setCopyCode("");
           alert("Pagamento cancelado ou expirado. Tente novamente.");
-          try { unsubTrans(); } catch (e) {}
+          try {
+            unsubTrans();
+          } catch (e) {}
           transUnsubRef.current = null;
         }
       });
@@ -147,39 +154,80 @@ export default function Presentes() {
   };
 
   return (
-    <div style={{ padding: "2rem", backgroundColor: "#f5f5f5", minHeight: "100vh" }}>
-
-      {/* 🔹 Banner topo */}
+    <div
+      style={{
+        padding: "20px",
+        margin: "0 auto", // ⭐ margem geral
+        maxWidth: "1100px", // ⭐ centralização bonita
+      }}
+    >
+      {/* =====================================================
+                BANNER
+      ====================================================== */}
       <div
+        className="presentes-conteudo"
         style={{
-          backgroundImage: "url('https://png.pngtree.com/png-vector/20241205/ourlarge/pngtree-purple-present-with-bow-a-unique-gift-for-the-holidays-png-image_14604272.png')",
-          backgroundSize: "120px",
-          backgroundRepeat: "no-repeat",
-          backgroundPosition: "center 20px",
-          padding: "150px 20px 40px 20px",
-          textAlign: "center",
-          backgroundColor: "#fff",
-          borderRadius: 12,
-          boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-          marginBottom: "2rem",
+          display: "flex",
+          alignItems: "center",
+          backgroundColor: "#f5f8f6",
+          borderRadius: "12px",
+          overflow: "hidden",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+          maxWidth: "1000px",
+          margin: "0 auto 2rem auto",
+          flexWrap: "wrap",
+          padding: "20px",
         }}
       >
-        <h2 style={{ color: "#2e7d32", fontSize: 26 }}>
-          Esta é a nossa lista de presentes e um de nossos grandes sonhos como casal.
-        </h2>
-        <p style={{ marginTop: 10, fontSize: 16, color: "#444" }}>
-          Ficamos muito felizes em compartilhar com vocês esse momento tão especial cheio de amor ❤️
-        </p>
+        <div
+          className="presentes-imagem"
+          style={{ flex: "1 1 300px", textAlign: "center" }}
+        >
+          <img
+            src={presenteImg}
+            alt="Presente"
+            style={{
+              width: "100%",
+              maxWidth: "260px",
+              borderRadius: "12px",
+              objectFit: "cover",
+            }}
+          />
+        </div>
+
+        <div
+          className="presentes-texto"
+          style={{
+            flex: "1 1 300px",
+            padding: "20px",
+            textAlign: "left",
+          }}
+        >
+          <h2 style={{ color: "#2e7d32", marginBottom: "10px" }}>
+            Lista de Presentes
+          </h2>
+
+          <p style={{ color: "#444", marginBottom: "20px" }}>
+            Esta é a nossa lista de presentes e um de nossos grandes sonhos como
+            casal. Ficamos muito felizes em compartilhar com vocês esse momento
+            tão especial 💚
+          </p>
+        </div>
       </div>
 
-      {/* ============================
-          🔹 BLOCO CASA COMPLETA
-      ============================== */}
-      <h2 style={{ color: "#2e7d32", marginBottom: 20, textAlign: "center" }}>
+      {/* CASA COMPLETA */}
+      <h2
+        style={{
+          color: "#2e7d32",
+          marginBottom: 20,
+          textAlign: "center",
+          marginTop: "20px",
+        }}
+      >
         🏡 CASA COMPLETA
       </h2>
 
-      {/* 🔹 Filtros */}
+      {/* FILTRO */}
       <div style={{ textAlign: "center", marginBottom: "1rem" }}>
         <select
           value={sortOption}
@@ -199,13 +247,14 @@ export default function Presentes() {
         </select>
       </div>
 
-      {/* 🎁 Lista CASA COMPLETA */}
+      {/* GRID CASA COMPLETA */}
       <div
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))",
           gap: "1.5rem",
           marginTop: "1rem",
+          marginBottom: "2rem", // ⭐ espaço final
         }}
       >
         {ordenarPresentes(presentes).map((p) => (
@@ -245,7 +294,9 @@ export default function Presentes() {
               </div>
             )}
 
-            <h3 style={{ color: "#2e7d32", marginBottom: "0.5rem" }}>{p.nome}</h3>
+            <h3 style={{ color: "#2e7d32", marginBottom: "0.5rem" }}>
+              {p.nome}
+            </h3>
             <p>
               <strong>Valor:</strong> R$ {Number(p.preco).toFixed(2)}
             </p>
@@ -269,9 +320,7 @@ export default function Presentes() {
         ))}
       </div>
 
-      {/* ============================
-          🎉 BLOCO LISTA DIVERTIDA
-      ============================== */}
+      {/* LISTA DIVERTIDA */}
       <h2
         style={{
           color: "#8e24aa",
@@ -360,9 +409,6 @@ export default function Presentes() {
         )}
       </div>
 
-      {/* ============================
-          🔹 Modal Pix
-      ============================== */}
       {(qrCode || paymentConfirmed) && selectedGift && (
         <div
           style={{
@@ -403,13 +449,21 @@ export default function Presentes() {
                 }}
               >
                 ✅ Pagamento confirmado com sucesso!
-                <p style={{ fontSize: "1rem", marginTop: "1rem", color: "#4caf50" }}>
+                <p
+                  style={{
+                    fontSize: "1rem",
+                    marginTop: "1rem",
+                    color: "#4caf50",
+                  }}
+                >
                   Obrigado por presentear! ❤️
                 </p>
               </div>
             ) : (
               <>
-                <h3 style={{ color: "#2e7d32" }}>Pagamento de {selectedGift.nome}</h3>
+                <h3 style={{ color: "#2e7d32" }}>
+                  Pagamento de {selectedGift.nome}
+                </h3>
 
                 <img
                   src={qrCode}
@@ -441,6 +495,7 @@ export default function Presentes() {
                         fontSize: "12px",
                       }}
                     />
+
                     <button
                       onClick={copiarQRCode}
                       style={{
