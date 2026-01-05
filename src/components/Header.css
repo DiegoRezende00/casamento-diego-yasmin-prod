@@ -1,14 +1,22 @@
 /* ======== ESTILO BASE ======== */
 .header-container {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 2rem;
-  background-color: #2e5939; /* cor original do seu header */
+  justify-content: center; /* centraliza o conteúdo interno */
+  background-color: #2e5939;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   position: sticky;
   top: 0;
   z-index: 1000;
+}
+
+/* ======== WRAPPER CENTRALIZADOR ======== */
+.header-inner {
+  width: 100%;
+  max-width: 1100px;
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .header-logo .logo-text {
@@ -52,7 +60,7 @@
   display: block;
   height: 3px;
   width: 100%;
-  background-color: rgb(255, 255, 255); /* mesma cor dos links */
+  background-color: rgb(255, 255, 255);
   border-radius: 5px;
   transition: 0.3s ease;
 }
@@ -83,7 +91,7 @@
     width: 100%;
     flex-direction: column;
     align-items: center;
-    background-color: #2e5939; /* mantém a cor original */
+    background-color: #2e5939;
     border-top: 1px solid rgba(0, 0, 0, 0.1);
     box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
     overflow: hidden;
