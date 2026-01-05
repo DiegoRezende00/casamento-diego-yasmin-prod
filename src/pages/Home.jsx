@@ -4,7 +4,7 @@ import presenteImg from "../assets/presente.jpg"; // imagem da seção de presen
 import fundoSite from "../assets/fundo-site.jpg"; // imagem de fundo enviada
 
 const Home = () => {
-  const casamentoData = new Date("2026-07-11T12:00:00");
+  const casamentoData = new Date("2026-07-11T12:00:50");
   const [diasRestantes, setDiasRestantes] = useState(0);
 
   useEffect(() => {
