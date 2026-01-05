@@ -22,25 +22,16 @@ const Casamento = () => {
           Nosso Casamento 💍
         </h1>
 
-      <div className="info-container">
-        <p>
-          <strong>Data:</strong> 11 de Julho de 2026 — 12h00
-        </p>
-        <p>
-          <strong>Local:</strong> Rodovia do Açúcar SP - KM 154,5 - SN - Batistada, Piracicaba - SP, 13423-070
-        </p>
+        <div className="info-container">
+          <p>
+            <strong>Data:</strong> 11 de Julho de 2026 — 12h00
+          </p>
+          <p>
+            <strong>Local:</strong> Rodovia do Açúcar SP - KM 154,5 - SN - Batistada,
+            Piracicaba - SP, 13423-070
+          </p>
 
-        <div className="botoes-container">
-          <button
-            className="botao-maps"
-            onClick={() => window.open(googleMapsLink, "_blank")}
-          >
-            📍 Abrir no Google Maps
-          </button>
-          <button
-            className="botao-agenda"
-            onClick={() => window.open(googleCalendarLink, "_blank")}
-          >
+          <div className="botoes-container">
             <button
               className="botao-maps"
               style={{
