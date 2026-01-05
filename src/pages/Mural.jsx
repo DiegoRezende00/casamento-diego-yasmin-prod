@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { collection, onSnapshot, addDoc } from "firebase/firestore";
+import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase";
 import ModalRecado from "../components/ModalRecado";
 import "./Mural.css";
@@ -18,6 +18,7 @@ export default function Mural() {
   return (
     <div className="mural-container">
       <h2>Mural de Recados 💌</h2>
+
       {recados.length === 0 ? (
         <p>Seja o primeiro a deixar um recado para Yasmin & Diego!</p>
       ) : (
@@ -32,12 +33,11 @@ export default function Mural() {
         </div>
       )}
 
-        <button className="btn-adicionar" onClick={() => setModalOpen(true)}>
-          + Adicione seu recado
-        </button>
+      <button className="btn-adicionar" onClick={() => setModalOpen(true)}>
+        + Adicione seu recado
+      </button>
 
-        {modalOpen && <ModalRecado onClose={() => setModalOpen(false)} />}
-      </div>
+      {modalOpen && <ModalRecado onClose={() => setModalOpen(false)} />}
     </div>
   );
 }
