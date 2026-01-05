@@ -1,20 +1,10 @@
-/* ======== NOVO: wrapper com margens laterais ======== */
-.header-inner {
-  width: 100%;
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 0 20px; /* margem lateral */
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
 /* ======== ESTILO BASE ======== */
 .header-container {
   display: flex;
-  justify-content: center;
-  background-color: #2e5939;
-  padding: 1rem 0;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  background-color: #2e5939; /* cor original do seu header */
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   position: sticky;
   top: 0;
@@ -25,7 +15,7 @@
   font-family: "Playfair Display", serif;
   font-size: 1.8rem;
   text-decoration: none;
-  color: #fff;
+  color: rgb(255, 255, 255);
 }
 
 /* ======== MENU LINKS ======== */
@@ -37,13 +27,13 @@
 
 .header-nav a {
   text-decoration: none;
-  color: #fff;
+  color: rgb(255, 255, 255);
   font-weight: 600;
   transition: color 0.3s ease;
 }
 
 .header-nav a:hover {
-  color: #fff;
+  color: rgb(255, 255, 255);
 }
 
 /* ======== BOTÃO HAMBURGUER ======== */
@@ -62,18 +52,20 @@
   display: block;
   height: 3px;
   width: 100%;
-  background-color: #fff;
+  background-color: rgb(255, 255, 255); /* mesma cor dos links */
   border-radius: 5px;
   transition: 0.3s ease;
 }
 
-/* X */
+/* Animação quando o menu está aberto */
 .menu-toggle.aberto span:nth-child(1) {
   transform: rotate(45deg) translateY(8px);
 }
+
 .menu-toggle.aberto span:nth-child(2) {
   opacity: 0;
 }
+
 .menu-toggle.aberto span:nth-child(3) {
   transform: rotate(-45deg) translateY(-8px);
 }
@@ -91,7 +83,7 @@
     width: 100%;
     flex-direction: column;
     align-items: center;
-    background-color: #2e5939;
+    background-color: #2e5939; /* mantém a cor original */
     border-top: 1px solid rgba(0, 0, 0, 0.1);
     box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
     overflow: hidden;
@@ -110,11 +102,11 @@
     padding: 0.8rem 0;
     width: 100%;
     text-align: center;
-    color: #fff;
+    color: rgb(255, 255, 255);
     font-size: 1rem;
   }
 
   .header-nav a:hover {
-    background-color: #fff4;
+    background-color: rgb(255, 255, 255);
   }
 }
