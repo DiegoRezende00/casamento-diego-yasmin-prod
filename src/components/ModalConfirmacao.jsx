@@ -21,7 +21,7 @@ function ModalConfirmacao({ show, codigo, onConfirmar, onNaoComparecer, onClose 
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <h3 className="modal-title">Confirmação de Presença</h3>
         <p className="modal-message">
-          Olá {nomeConvidado}, você está confirmando sua presença no evento de Diego & Yasmin?
+          Olá {nomeConvidado}, você está confirmando sua presença no evento de Yasmin & Diego?
         </p>
         
         {/* Botões de Ação */}

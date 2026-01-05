@@ -11,13 +11,11 @@ const Header = () => {
 
   return (
     <header className="header-container">
-      <div className="header-inner">
-        <div className="header-logo">
-          <Link to="/" className="logo-text">
-            D & Y
-          </Link>
-        </div>
-
+      <div className="header-logo">
+        <Link to="/" className="logo-text">
+          Y & D
+        </Link>
+      </div>
         <nav className={`header-nav ${menuAberto ? "ativo" : ""}`}>
           <Link to="/" onClick={() => setMenuAberto(false)}>Inicio</Link>
           <Link to="/presentes" onClick={() => setMenuAberto(false)}>Lista de Presentes</Link>

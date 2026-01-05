@@ -22,46 +22,24 @@ const Casamento = () => {
           Nosso Casamento 💍
         </h1>
 
-        <div className="mapa-container" style={{ width: "100%" }}>
-          <iframe
-            title="Local do Casamento"
-            style={{
-              width: "100%",
-              height: "350px",
-              border: "0",
-              borderRadius: "10px",
-            }}
-            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3678.4384783394485!2d-47.5846155!3d-22.786210999999998!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x94c6256ed0a3e573%3A0xaab5a960bb7a8a29!2sTaquaral%20Café!5e0!3m2!1spt-BR!2sbr!4v1762302338422!5m2!1spt-BR!2sbr"
-            allowFullScreen=""
-            loading="lazy"
-          ></iframe>
-        </div>
+      <div className="info-container">
+        <p>
+          <strong>Data:</strong> 11 de Julho de 2026 — 12h00
+        </p>
+        <p>
+          <strong>Local:</strong> Rodovia do Açúcar SP - KM 154,5 - SN - Batistada, Piracicaba - SP, 13423-070
+        </p>
 
-        <div
-          className="info-container"
-          style={{
-            marginTop: "20px",
-            textAlign: "center",
-            lineHeight: "1.6",
-          }}
-        >
-          <p>
-            <strong>Data:</strong> 11 de julho de 2026 — 15h30
-          </p>
-
-          <p>
-            <strong>Local:</strong> Rodovia do Açúcar SP - KM 154,5 - SN -
-            Batistada, Piracicaba - SP, 13423-070
-          </p>
-
-          <div
-            className="botoes-container"
-            style={{
-              marginTop: "20px",
-              display: "flex",
-              flexDirection: "column",
-              gap: "12px",
-            }}
+        <div className="botoes-container">
+          <button
+            className="botao-maps"
+            onClick={() => window.open(googleMapsLink, "_blank")}
+          >
+            📍 Abrir no Google Maps
+          </button>
+          <button
+            className="botao-agenda"
+            onClick={() => window.open(googleCalendarLink, "_blank")}
           >
             <button
               className="botao-maps"
