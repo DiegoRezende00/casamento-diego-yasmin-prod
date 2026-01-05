@@ -19,7 +19,7 @@ export default function Mural() {
     <div className="mural-container">
       <h2>Mural de Recados 💌</h2>
       {recados.length === 0 ? (
-        <p>Seja o primeiro a deixar um recado para Diego & Yasmin!</p>
+        <p>Seja o primeiro a deixar um recado para Yasmin & Diego!</p>
       ) : (
         <div className="recados-lista">
           {recados.map((r, i) => (

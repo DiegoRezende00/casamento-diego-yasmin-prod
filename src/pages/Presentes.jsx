@@ -203,7 +203,7 @@ export default function Presentes() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))",
           gap: "1.5rem",
           marginTop: "1rem",
         }}
@@ -286,7 +286,7 @@ export default function Presentes() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))",
           gap: "1.5rem",
           marginBottom: "2rem",
         }}

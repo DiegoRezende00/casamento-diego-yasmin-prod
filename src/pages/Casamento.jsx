@@ -22,7 +22,7 @@ const Casamento = () => {
 
       <div className="info-container">
         <p>
-          <strong>Data:</strong> 20 de dezembro de 2025 — 16h30
+          <strong>Data:</strong> 11 de Julho de 2026 — 12h00
         </p>
         <p>
           <strong>Local:</strong> Rodovia do Açúcar SP - KM 154,5 - SN - Batistada, Piracicaba - SP, 13423-070

@@ -4,7 +4,7 @@ import presenteImg from "../assets/presente.jpg"; // imagem da seção de presen
 import fundoSite from "../assets/fundo-site.jpg"; // imagem de fundo enviada
 
 const Home = () => {
-  const casamentoData = new Date("2026-07-12T16:30:00");
+  const casamentoData = new Date("2026-07-11T12:00:00");
   const [diasRestantes, setDiasRestantes] = useState(0);
 
   useEffect(() => {
@@ -29,9 +29,9 @@ const Home = () => {
       <div className="overlay">
         <section className="save-date-section">
           <h2 className="save-date-text">Save the Date</h2>
-          <h1 className="nomes">Diego & Yasmin</h1>
+          <h1 className="nomes">Yasmin & Diego</h1>
           <p className="contador">
-            12.07.2026 — Faltam {diasRestantes} dias
+            11.07.2026 — Faltam {diasRestantes} dias
           </p>
         </section>
 
@@ -41,7 +41,7 @@ const Home = () => {
 
           <div className="evento-info">
             <p>
-              <span className="emoji">📅</span> 12 de julho de 2026 — 10h30
+              <span className="emoji">📅</span> 11 de julho de 2026 — 12h00
             </p>
             <p>
               <span className="emoji">📍</span> Rodovia do Açúcar SP - KM 154,5 - SN - Batistada, Piracicaba - SP, 13423-070
