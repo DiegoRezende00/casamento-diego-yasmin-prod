@@ -137,7 +137,7 @@ function Presenca() {
                         Qual o nome que está no convite?
                     </h1>
                     <p className="subtitle">
-                        Você pode informar o nome do convite <br /> ou o PIN enviado por Diego & Yasmin
+                        Você pode informar o nome do convite <br /> ou o PIN enviado por Yasmin & Diego
                     </p>
 
                     <div className="form-area">
