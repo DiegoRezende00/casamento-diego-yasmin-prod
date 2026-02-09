@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import presenteImg from "../assets/presente.jpg";
+import loadingImg from "../assets/loading.gif";
 import { db } from "../firebase";
 import {
   collection,
@@ -23,6 +24,7 @@ export default function Presentes() {
   const [qrCode, setQrCode] = useState(null);
   const [copyCode, setCopyCode] = useState("");
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [nomePresenteador, setNomePresenteador] = useState("");
@@ -87,6 +89,7 @@ export default function Presentes() {
       setQrCode(null);
       setCopyCode("");
       setPaymentConfirmed(false);
+      setIsGenerating(true);
 
       const { data } = await axios.post(
         `${import.meta.env.VITE_API_URL}/create_payment`,
@@ -97,9 +100,14 @@ export default function Presentes() {
       const paymentId = data.paymentId || data.id;
       if (!paymentId) throw new Error("paymentId ausente");
 
-      if (data.qr_base64)
+      if (data.qr_base64) {
         setQrCode(`data:image/png;base64,${data.qr_base64}`);
-      if (data.qr_code) setCopyCode(data.qr_code);
+      }
+      if (data.qr_code) {
+        setCopyCode(data.qr_code);
+      }
+
+      setIsGenerating(false);
 
       await setDoc(
         doc(db, p.collectionName, p.id, "transactions", paymentId),
@@ -139,9 +147,10 @@ export default function Presentes() {
       });
 
       transUnsubRef.current = unsub;
-    } catch (e) {
-      console.error(e);
+    } catch (err) {
+      console.error(err);
       alert("Erro ao gerar pagamento.");
+      setIsGenerating(false);
     } finally {
       setLoadingId(null);
     }
@@ -166,7 +175,6 @@ export default function Presentes() {
           borderRadius: 12,
           padding: 20,
           marginBottom: 30,
-          alignItems: "center",
           justifyContent: "center",
           textAlign: "center",
         }}
@@ -234,20 +242,48 @@ export default function Presentes() {
       )}
 
       {/* MODAL PAGAMENTO */}
-      {(qrCode || paymentConfirmed) && selectedGift && (
+      {(isGenerating || qrCode || paymentConfirmed) && selectedGift && (
         <Modal>
-          {paymentConfirmed ? (
+          {isGenerating && (
+            <>
+              <img
+                src={loadingImg}
+                alt="Gerando pagamento"
+                style={{ display: "block", margin: "0 auto 20px" }}
+                width={160}
+              />
+              <p style={{ textAlign: "center" }}>Gerando pagamento…</p>
+            </>
+          )}
+
+          {!isGenerating && paymentConfirmed && (
             <h2 style={{ color: "#2e7d32", textAlign: "center" }}>
               ✅ Pagamento confirmado!
             </h2>
-          ) : (
+          )}
+
+          {!isGenerating && qrCode && (
             <>
+              <p
+                style={{
+                  wordBreak: "break-all",
+                  fontSize: 13,
+                  background: "#f4f4f4",
+                  padding: 10,
+                  borderRadius: 6,
+                  marginBottom: 15,
+                }}
+              >
+                {copyCode}
+              </p>
+
               <img
                 src={qrCode}
                 alt="QR Code"
                 style={{ display: "block", margin: "0 auto 20px" }}
                 width={240}
               />
+
               <button
                 onClick={copiarQRCode}
                 style={{
@@ -297,12 +333,12 @@ const Grid = ({ lista, cor, onPresentear, loadingId }) => (
           background: "#fff",
           padding: 16,
           borderRadius: 12,
-          textAlign: "center",
           border: "1px solid #e0e0e0",
           boxShadow: "0 4px 10px rgba(0,0,0,0.08)",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
+          textAlign: "center",
         }}
       >
         {p.imagemUrl && (
@@ -314,6 +350,7 @@ const Grid = ({ lista, cor, onPresentear, loadingId }) => (
               alignItems: "center",
               justifyContent: "center",
               overflow: "hidden",
+              marginBottom: 10,
             }}
           >
             <img
@@ -328,7 +365,7 @@ const Grid = ({ lista, cor, onPresentear, loadingId }) => (
           </div>
         )}
 
-        <h3 style={{ color: cor, marginTop: 10 }}>{p.nome}</h3>
+        <h3 style={{ color: cor }}>{p.nome}</h3>
         <p>R$ {Number(p.preco).toFixed(2)}</p>
 
         <button
