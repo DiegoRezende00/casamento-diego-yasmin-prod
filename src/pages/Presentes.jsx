@@ -1,5 +1,3 @@
-// ⭐⭐ ARQUIVO COMPLETO ALTERADO ⭐⭐
-
 import React, { useEffect, useState, useRef } from "react";
 import presenteImg from "../assets/presente.jpg";
 import { db } from "../firebase";
@@ -7,7 +5,7 @@ import {
   collection,
   onSnapshot,
   doc,
-  updateDoc,
+  setDoc,
   serverTimestamp,
   onSnapshot as onDocSnapshot,
 } from "firebase/firestore";
@@ -16,68 +14,78 @@ import axios from "axios";
 export default function Presentes() {
   const [presentes, setPresentes] = useState([]);
   const [funPresents, setFunPresents] = useState([]);
+
+  const [sortCasa, setSortCasa] = useState("az");
+  const [sortFun, setSortFun] = useState("az");
+
   const [loadingId, setLoadingId] = useState(null);
-  const [qrCode, setQrCode] = useState(null);
   const [selectedGift, setSelectedGift] = useState(null);
+  const [qrCode, setQrCode] = useState(null);
   const [copyCode, setCopyCode] = useState("");
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
-  const [sortOption, setSortOption] = useState("az");
+
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [nomePresenteador, setNomePresenteador] = useState("");
+  const [giftToConfirm, setGiftToConfirm] = useState(null);
+
   const transUnsubRef = useRef(null);
 
+  /* ================= FIREBASE ================= */
+
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "presents"), (snapshot) => {
-      const lista = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setPresentes(lista);
+    return onSnapshot(collection(db, "presents"), (snap) => {
+      setPresentes(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
-    return () => unsub();
   }, []);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "funPresents"), (snapshot) => {
-      const lista = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setFunPresents(lista);
+    return onSnapshot(collection(db, "funPresents"), (snap) => {
+      setFunPresents(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
-    return () => unsub();
   }, []);
 
-  const ordenarPresentes = (lista) => {
-    const sorted = [...lista];
+  /* ================= UTIL ================= */
 
-    switch (sortOption) {
+  const ordenar = (lista, sort) => {
+    const arr = [...lista];
+    switch (sort) {
       case "menor":
-        sorted.sort((a, b) => Number(a.preco) - Number(b.preco));
+        arr.sort((a, b) => Number(a.preco) - Number(b.preco));
         break;
       case "maior":
-        sorted.sort((a, b) => Number(b.preco) - Number(a.preco));
+        arr.sort((a, b) => Number(b.preco) - Number(a.preco));
         break;
       case "za":
-        sorted.sort((a, b) => b.nome.localeCompare(a.nome));
+        arr.sort((a, b) => b.nome.localeCompare(a.nome));
         break;
       default:
-        sorted.sort((a, b) => a.nome.localeCompare(b.nome));
+        arr.sort((a, b) => a.nome.localeCompare(b.nome));
     }
-
-    return sorted;
+    return arr;
   };
 
-  const reservar = async (p) => {
-    const confirm = window.confirm(
-      `Deseja presentear "${p.nome}" por R$ ${Number(p.preco).toFixed(2)}?`
-    );
-    if (!confirm) return;
+  /* ================= MODAL ================= */
+
+  const abrirModal = (p, collectionName) => {
+    setGiftToConfirm({ ...p, collectionName });
+    setNomePresenteador("");
+    setShowConfirmModal(true);
+  };
+
+  const confirmarPresente = async () => {
+    if (!nomePresenteador.trim()) {
+      alert("Informe o nome de quem está presenteando.");
+      return;
+    }
+
+    const p = giftToConfirm;
+    setShowConfirmModal(false);
 
     try {
-      if (transUnsubRef.current) {
-        try {
-          transUnsubRef.current();
-        } catch (e) {}
-        transUnsubRef.current = null;
-      }
-
       setLoadingId(p.id);
+      setSelectedGift(p);
       setQrCode(null);
       setCopyCode("");
-      setSelectedGift(p);
       setPaymentConfirmed(false);
 
       const { data } = await axios.post(
@@ -86,27 +94,33 @@ export default function Presentes() {
         { headers: { "Content-Type": "application/json" } }
       );
 
-      const paymentId = data.paymentId || data.id || null;
-      if (!paymentId) {
-        alert("Erro: paymentId ausente na resposta do servidor.");
-        return;
-      }
+      const paymentId = data.paymentId || data.id;
+      if (!paymentId) throw new Error("paymentId ausente");
 
-      if (data.qr_base64) setQrCode(`data:image/png;base64,${data.qr_base64}`);
+      if (data.qr_base64)
+        setQrCode(`data:image/png;base64,${data.qr_base64}`);
       if (data.qr_code) setCopyCode(data.qr_code);
 
-      try {
-        const presentRef = doc(db, "presents", p.id);
-        await updateDoc(presentRef, {
-          "payment.lastMp": paymentId,
-          "payment.lastCreatedAt": serverTimestamp(),
-        });
-      } catch (e) {
-        console.warn("⚠️ Não foi possível atualizar present.lastMp", e);
-      }
+      await setDoc(
+        doc(db, p.collectionName, p.id, "transactions", paymentId),
+        {
+          nomePresenteador: nomePresenteador.trim(),
+          presente: p.nome,
+          valor: p.preco,
+          status: "pending",
+          createdAt: serverTimestamp(),
+        }
+      );
 
-      const transRef = doc(db, "presents", p.id, "transactions", paymentId);
-      const unsubTrans = onDocSnapshot(transRef, (snap) => {
+      const transRef = doc(
+        db,
+        p.collectionName,
+        p.id,
+        "transactions",
+        paymentId
+      );
+
+      const unsub = onDocSnapshot(transRef, (snap) => {
         if (!snap.exists()) return;
         const tx = snap.data();
 
@@ -120,403 +134,267 @@ export default function Presentes() {
             setSelectedGift(null);
           }, 8000);
 
-          try {
-            unsubTrans();
-          } catch (e) {}
-          transUnsubRef.current = null;
-        } else if (["cancelled", "rejected", "expired"].includes(tx.status)) {
-          setQrCode(null);
-          setSelectedGift(null);
-          setCopyCode("");
-          alert("Pagamento cancelado ou expirado. Tente novamente.");
-          try {
-            unsubTrans();
-          } catch (e) {}
-          transUnsubRef.current = null;
+          unsub();
         }
       });
 
-      transUnsubRef.current = unsubTrans;
-    } catch (err) {
-      console.error("❌ Erro ao criar pagamento:", err.response || err);
-      alert("Erro ao iniciar o pagamento. Verifique o console.");
+      transUnsubRef.current = unsub;
+    } catch (e) {
+      console.error(e);
+      alert("Erro ao gerar pagamento.");
     } finally {
       setLoadingId(null);
     }
   };
 
   const copiarQRCode = () => {
-    if (!copyCode) return;
-    navigator.clipboard
-      .writeText(copyCode)
-      .then(() => alert("Código Pix copiado!"))
-      .catch(() => alert("Erro ao copiar o código Pix."));
+    navigator.clipboard.writeText(copyCode);
+    alert("Código Pix copiado!");
   };
 
+  /* ================= UI ================= */
+
   return (
-    <div
-      style={{
-        padding: "20px",
-        margin: "0 auto", // ⭐ margem geral
-        maxWidth: "1100px", // ⭐ centralização bonita
-      }}
-    >
-      {/* =====================================================
-                BANNER
-      ====================================================== */}
+    <div style={{ padding: 20, maxWidth: 1100, margin: "0 auto" }}>
+      {/* BANNER */}
       <div
-        className="presentes-conteudo"
         style={{
           display: "flex",
-          alignItems: "center",
-          backgroundColor: "#f5f8f6",
-          borderRadius: "12px",
-          overflow: "hidden",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-          maxWidth: "1000px",
-          margin: "0 auto 2rem auto",
           flexWrap: "wrap",
-          padding: "20px",
-        }}
-      >
-        <div
-          className="presentes-imagem"
-          style={{ flex: "1 1 300px", textAlign: "center" }}
-        >
-          <img
-            src={presenteImg}
-            alt="Presente"
-            style={{
-              width: "100%",
-              maxWidth: "260px",
-              borderRadius: "12px",
-              objectFit: "cover",
-            }}
-          />
-        </div>
-
-        <div
-          className="presentes-texto"
-          style={{
-            flex: "1 1 300px",
-            padding: "20px",
-            textAlign: "left",
-          }}
-        >
-          <h2 style={{ color: "#2e7d32", marginBottom: "10px" }}>
-            Lista de Presentes
-          </h2>
-
-          <p style={{ color: "#444", marginBottom: "20px" }}>
-            Esta é a nossa lista de presentes e um de nossos grandes sonhos como
-            casal. Ficamos muito felizes em compartilhar com vocês esse momento
-            tão especial 💚
-          </p>
-        </div>
-      </div>
-
-      {/* CASA COMPLETA */}
-      <h2
-        style={{
-          color: "#2e7d32",
-          marginBottom: 20,
-          textAlign: "center",
-          marginTop: "20px",
-        }}
-      >
-        🏡 CASA COMPLETA
-      </h2>
-
-      {/* FILTRO */}
-      <div style={{ textAlign: "center", marginBottom: "1rem" }}>
-        <select
-          value={sortOption}
-          onChange={(e) => setSortOption(e.target.value)}
-          style={{
-            padding: "10px",
-            borderRadius: 8,
-            border: "1px solid #2e7d32",
-            fontSize: 16,
-            cursor: "pointer",
-          }}
-        >
-          <option value="az">Ordenar: A → Z</option>
-          <option value="za">Ordenar: Z → A</option>
-          <option value="menor">Menor valor</option>
-          <option value="maior">Maior valor</option>
-        </select>
-      </div>
-
-      {/* GRID CASA COMPLETA */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))",
-          gap: "1.5rem",
-          marginTop: "1rem",
-          marginBottom: "2rem", // ⭐ espaço final
-        }}
-      >
-        {ordenarPresentes(presentes).map((p) => (
-          <div
-            key={p.id}
-            style={{
-              backgroundColor: "white",
-              padding: "1rem",
-              borderRadius: "10px",
-              boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
-              textAlign: "center",
-            }}
-          >
-            {p.imagemUrl && (
-              <div
-                style={{
-                  width: "100%",
-                  height: "220px",
-                  backgroundColor: "#fafafa",
-                  borderRadius: "8px",
-                  overflow: "hidden",
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  marginBottom: "10px",
-                }}
-              >
-                <img
-                  src={p.imagemUrl}
-                  alt={p.nome}
-                  style={{
-                    maxWidth: "100%",
-                    maxHeight: "100%",
-                    objectFit: "contain",
-                  }}
-                />
-              </div>
-            )}
-
-            <h3 style={{ color: "#2e7d32", marginBottom: "0.5rem" }}>
-              {p.nome}
-            </h3>
-            <p>
-              <strong>Valor:</strong> R$ {Number(p.preco).toFixed(2)}
-            </p>
-
-            <button
-              onClick={() => reservar(p)}
-              disabled={loadingId === p.id}
-              style={{
-                backgroundColor: "#2e7d32",
-                color: "#fff",
-                padding: "10px 15px",
-                borderRadius: 8,
-                marginTop: "10px",
-                cursor: "pointer",
-                opacity: loadingId === p.id ? 0.7 : 1,
-              }}
-            >
-              {loadingId === p.id ? "Gerando..." : "Presentear 🎁"}
-            </button>
-          </div>
-        ))}
-      </div>
-
-      {/* LISTA DIVERTIDA */}
-      <h2
-        style={{
-          color: "#8e24aa",
-          marginTop: "3rem",
-          marginBottom: "1rem",
+          gap: 20,
+          background: "#f5f8f6",
+          borderRadius: 12,
+          padding: 20,
+          marginBottom: 30,
+          alignItems: "center",
+          justifyContent: "center",
           textAlign: "center",
         }}
       >
+        <img
+          src={presenteImg}
+          alt="Presente"
+          style={{ maxWidth: 260, borderRadius: 12 }}
+        />
+        <div>
+          <h2 style={{ color: "#2e7d32" }}>Lista de Presentes</h2>
+          <p>Ficamos muito felizes em compartilhar esse momento com você 💚</p>
+        </div>
+      </div>
+
+      <h2 style={{ textAlign: "center", color: "#2e7d32" }}>🏡 CASA COMPLETA</h2>
+      <Filtro value={sortCasa} onChange={setSortCasa} />
+
+      <Grid
+        lista={ordenar(presentes, sortCasa)}
+        cor="#2e7d32"
+        onPresentear={(p) => abrirModal(p, "presents")}
+        loadingId={loadingId}
+      />
+
+      <h2 style={{ textAlign: "center", color: "#8e24aa", marginTop: 40 }}>
         🎉 LISTA DIVERTIDA
       </h2>
+      <Filtro value={sortFun} onChange={setSortFun} />
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))",
-          gap: "1.5rem",
-          marginBottom: "2rem",
-        }}
-      >
-        {funPresents.length === 0 ? (
-          <p style={{ textAlign: "center", width: "100%" }}>
-            Nenhum item divertido ainda 😄
-          </p>
-        ) : (
-          ordenarPresentes(funPresents).map((p) => (
-            <div
-              key={p.id}
+      <Grid
+        lista={ordenar(funPresents, sortFun)}
+        cor="#8e24aa"
+        onPresentear={(p) => abrirModal(p, "funPresents")}
+        loadingId={loadingId}
+      />
+
+      {/* MODAL CONFIRMAÇÃO */}
+      {showConfirmModal && (
+        <Modal>
+          <h3 style={{ textAlign: "center" }}>Quem está presenteando?</h3>
+
+          <div style={{ display: "flex", justifyContent: "center" }}>
+            <input
+              value={nomePresenteador}
+              onChange={(e) => setNomePresenteador(e.target.value)}
+              placeholder="Seu nome"
               style={{
-                backgroundColor: "white",
-                padding: "1rem",
-                borderRadius: "10px",
-                boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
+                width: "100%",
+                maxWidth: 280,
+                padding: 12,
+                marginTop: 20,
+                borderRadius: 8,
+                border: "1px solid #ccc",
                 textAlign: "center",
               }}
-            >
-              {p.imagemUrl && (
-                <div
-                  style={{
-                    width: "100%",
-                    height: "220px",
-                    backgroundColor: "#fafafa",
-                    borderRadius: "8px",
-                    overflow: "hidden",
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    marginBottom: "10px",
-                  }}
-                >
-                  <img
-                    src={p.imagemUrl}
-                    alt={p.nome}
-                    style={{
-                      maxWidth: "100%",
-                      maxHeight: "100%",
-                      objectFit: "contain",
-                    }}
-                  />
-                </div>
-              )}
-
-              <h3 style={{ color: "#8e24aa", marginBottom: "0.5rem" }}>
-                {p.nome}
-              </h3>
-              <p>
-                <strong>Valor:</strong> R$ {Number(p.preco).toFixed(2)}
-              </p>
-
-              <button
-                onClick={() => reservar(p)}
-                disabled={loadingId === p.id}
-                style={{
-                  backgroundColor: "#8e24aa",
-                  color: "#fff",
-                  padding: "10px 15px",
-                  borderRadius: 8,
-                  marginTop: "10px",
-                  cursor: "pointer",
-                  opacity: loadingId === p.id ? 0.7 : 1,
-                }}
-              >
-                {loadingId === p.id ? "Gerando..." : "Presentear 🎁"}
-              </button>
-            </div>
-          ))
-        )}
-      </div>
-
-      {(qrCode || paymentConfirmed) && selectedGift && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100vw",
-            height: "100vh",
-            backgroundColor: "rgba(0,0,0,0.6)",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: 1000,
-          }}
-        >
-          <div
-            style={{
-              backgroundColor: "#fff",
-              padding: "2rem",
-              borderRadius: "12px",
-              textAlign: "center",
-              boxShadow: "0 8px 20px rgba(0,0,0,0.3)",
-              maxWidth: "400px",
-              width: "90%",
-            }}
-          >
-            {paymentConfirmed ? (
-              <div
-                style={{
-                  color: "#2e7d32",
-                  fontSize: "1.8rem",
-                  fontWeight: "bold",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  minHeight: "250px",
-                }}
-              >
-                ✅ Pagamento confirmado com sucesso!
-                <p
-                  style={{
-                    fontSize: "1rem",
-                    marginTop: "1rem",
-                    color: "#4caf50",
-                  }}
-                >
-                  Obrigado por presentear! ❤️
-                </p>
-              </div>
-            ) : (
-              <>
-                <h3 style={{ color: "#2e7d32" }}>
-                  Pagamento de {selectedGift.nome}
-                </h3>
-
-                <img
-                  src={qrCode}
-                  alt="QR Code Pagamento"
-                  style={{
-                    marginTop: "1rem",
-                    width: "250px",
-                    height: "250px",
-                    borderRadius: "10px",
-                  }}
-                />
-
-                <p style={{ marginTop: "1rem" }}>
-                  Escaneie com o app do banco ou copie o código abaixo 👇
-                </p>
-
-                {copyCode && (
-                  <div style={{ marginTop: "1rem" }}>
-                    <input
-                      type="text"
-                      readOnly
-                      value={copyCode}
-                      style={{
-                        width: "100%",
-                        padding: "8px",
-                        borderRadius: 6,
-                        border: "1px solid #ccc",
-                        textAlign: "center",
-                        fontSize: "12px",
-                      }}
-                    />
-
-                    <button
-                      onClick={copiarQRCode}
-                      style={{
-                        marginTop: 8,
-                        backgroundColor: "#2e7d32",
-                        color: "#fff",
-                        padding: "6px 12px",
-                        borderRadius: 6,
-                        cursor: "pointer",
-                        fontSize: "14px",
-                      }}
-                    >
-                      Copiar código Pix
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
+            />
           </div>
-        </div>
+
+          <ModalActions
+            onCancel={() => setShowConfirmModal(false)}
+            onConfirm={confirmarPresente}
+          />
+        </Modal>
+      )}
+
+      {/* MODAL PAGAMENTO */}
+      {(qrCode || paymentConfirmed) && selectedGift && (
+        <Modal>
+          {paymentConfirmed ? (
+            <h2 style={{ color: "#2e7d32", textAlign: "center" }}>
+              ✅ Pagamento confirmado!
+            </h2>
+          ) : (
+            <>
+              <img
+                src={qrCode}
+                alt="QR Code"
+                style={{ display: "block", margin: "0 auto 20px" }}
+                width={240}
+              />
+              <button
+                onClick={copiarQRCode}
+                style={{
+                  width: "100%",
+                  padding: 12,
+                  borderRadius: 8,
+                  background: "#2e7d32",
+                  color: "#fff",
+                  border: "none",
+                }}
+              >
+                Copiar código Pix
+              </button>
+            </>
+          )}
+        </Modal>
       )}
     </div>
   );
 }
+
+/* ================= COMPONENTES ================= */
+
+const Filtro = ({ value, onChange }) => (
+  <div style={{ textAlign: "center", margin: "15px 0" }}>
+    <select value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="az">A → Z</option>
+      <option value="za">Z → A</option>
+      <option value="menor">Menor valor</option>
+      <option value="maior">Maior valor</option>
+    </select>
+  </div>
+);
+
+const Grid = ({ lista, cor, onPresentear, loadingId }) => (
+  <div
+    style={{
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fill, minmax(240px,1fr))",
+      gap: 24,
+    }}
+  >
+    {lista.map((p) => (
+      <div
+        key={p.id}
+        style={{
+          background: "#fff",
+          padding: 16,
+          borderRadius: 12,
+          textAlign: "center",
+          border: "1px solid #e0e0e0",
+          boxShadow: "0 4px 10px rgba(0,0,0,0.08)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+        }}
+      >
+        {p.imagemUrl && (
+          <div
+            style={{
+              width: "100%",
+              height: 180,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              overflow: "hidden",
+            }}
+          >
+            <img
+              src={p.imagemUrl}
+              alt={p.nome}
+              style={{
+                maxWidth: "100%",
+                maxHeight: "100%",
+                objectFit: "contain",
+              }}
+            />
+          </div>
+        )}
+
+        <h3 style={{ color: cor, marginTop: 10 }}>{p.nome}</h3>
+        <p>R$ {Number(p.preco).toFixed(2)}</p>
+
+        <button
+          onClick={() => onPresentear(p)}
+          disabled={loadingId === p.id}
+          style={{
+            marginTop: "auto",
+            background: cor,
+            color: "#fff",
+            padding: "10px 14px",
+            borderRadius: 8,
+            border: "none",
+            cursor: "pointer",
+          }}
+        >
+          Presentear 🎁
+        </button>
+      </div>
+    ))}
+  </div>
+);
+
+const Modal = ({ children }) => (
+  <div
+    style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0,0,0,0.6)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 16,
+      zIndex: 2000,
+    }}
+  >
+    <div
+      style={{
+        background: "#fff",
+        padding: 24,
+        borderRadius: 14,
+        maxWidth: 420,
+        width: "100%",
+      }}
+    >
+      {children}
+    </div>
+  </div>
+);
+
+const ModalActions = ({ onCancel, onConfirm }) => (
+  <div style={{ display: "flex", gap: 10, marginTop: 25 }}>
+    <button onClick={onCancel} style={{ flex: 1, padding: 10 }}>
+      Cancelar
+    </button>
+    <button
+      onClick={onConfirm}
+      style={{
+        flex: 1,
+        padding: 10,
+        background: "#2e7d32",
+        color: "#fff",
+        border: "none",
+        borderRadius: 6,
+      }}
+    >
+      Gerar QR Code
+    </button>
+  </div>
+);
